@@ -9,7 +9,9 @@ public class RTDirectionalLight : RTLight {
     private void Awake() {
 
         intensity = GetComponent<Light>().intensity;
-        color = GetComponent<Light>().color;
+        color.x = GetComponent<Light>().color.r;
+        color.y = GetComponent<Light>().color.g;
+        color.z = GetComponent<Light>().color.b;
         direction = transform.forward;
 
     }

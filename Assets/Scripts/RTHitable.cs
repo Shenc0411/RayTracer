@@ -5,15 +5,17 @@ using UnityEngine;
 public enum RenderMode { Opaque, Transparent }
 
 [RequireComponent(typeof(MeshRenderer), typeof(MeshFilter))]
-public abstract class RTObject : MonoBehaviour {
+public abstract class RTHitable : MonoBehaviour {
 
     public float reflectionRate;
     public float refractionRate;
 
     public RenderMode renderMode;
 
-    public Color albedo;
+    public Vector3 albedo;
 
     public Vector3 position;
+
+    public abstract RTHitInfo CheckCollision(RTRay ray);
 
 }

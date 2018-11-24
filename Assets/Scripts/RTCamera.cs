@@ -15,7 +15,7 @@ public class RTCamera : MonoBehaviour {
     private void Awake() {
         position = transform.position;
         direction = transform.forward;
-        nearPlaneDistance = GetComponent<Camera>().nearClipPlane;
+        nearPlaneDistance = GetComponent<Camera>().nearClipPlane + 0.1f;
     }
 
 }

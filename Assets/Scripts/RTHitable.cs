@@ -2,15 +2,21 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum RenderMode { Opaque, Transparent }
 
 [RequireComponent(typeof(MeshRenderer), typeof(MeshFilter))]
 public abstract class RTHitable : MonoBehaviour {
 
     public float reflectionRate;
-    public float refractionRate;
 
-    public RenderMode renderMode;
+    public float lambertCoefficient;
+
+    public float phongPower;
+    public float phongCoefficient;
+
+    public float blinnPhongPower;
+    public float blinnPhongCoefficient;
+
+    public float refractionRate;
 
     public Vector3 albedo;
 

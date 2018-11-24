@@ -15,33 +15,59 @@ public class RTSphere : RTHitable {
     }
 
     public override RTHitInfo CheckCollision(RTRay ray) {
-
         Vector3 OC = position - ray.origin;
         float OCDist = OC.magnitude;
-        if(OCDist < RayTracer.EPS + radius) {
-            //Inside Sphere - Refraction Case
+        if(OCDist < radius - RayTracer.EPS) {
+            //Inside Sphere
             float OQDist = 2.0f * Vector3.Dot(OC, ray.direction);
+            if(OQDist < 0) {
+                return null;
+            }
             Vector3 Q = ray.origin + OQDist * ray.direction;
             Vector3 normal = (position - Q).normalized;
-            RTRay reflection = new RTRay(Q, ray.direction - 2.0f * Vector3.Dot(ray.direction, normal) * normal, null);
+            RTRay reflection = null;
             RTRay refraction = null;
-            return new RTHitInfo(this, Q, normal, reflection, refraction);
+
+            if (reflectionRate > 0) {
+                reflection = new RTRay(Q, ray.direction - 2.0f * Vector3.Dot(ray.direction, normal) * normal, null);
+            }
+            if (refractionRate > 0) {
+                
+            }
+            
+            return new RTHitInfo(this, Q, normal, ray, reflection, refraction);
         }
-        else if(OCDist > RayTracer.EPS + radius) {
+        else if(OCDist > radius + RayTracer.EPS) {
             //Outside Sphere
             float OPDist = Vector3.Dot(OC, ray.direction);
-            float CPDist = Mathf.Sqrt(OCDist * OCDist + OPDist * OPDist);
+            if (OPDist < 0) {
+                //No Collision
+                return null;
+            }
+            float CPDist = Mathf.Sqrt(OCDist * OCDist - OPDist * OPDist);
             if(CPDist > radius) {
                 //No Collision
                 return null;
             }
             else {
                 float QPDist = Mathf.Sqrt(radius * radius - CPDist * CPDist);
+                if (OPDist < QPDist) {
+                    //No Collision
+                    return null;
+                }
                 Vector3 Q = ray.origin + (OPDist - QPDist) * ray.direction;
                 Vector3 normal = (Q - position).normalized;
-                RTRay reflection = new RTRay(Q, ray.direction - 2.0f * Vector3.Dot(ray.direction, normal) * normal, null);
+
+                RTRay reflection = null;
                 RTRay refraction = null;
-                return new RTHitInfo(this, Q, normal, reflection, refraction);
+
+                if (reflectionRate > 0) {
+                    reflection = new RTRay(Q, ray.direction - 2.0f * Vector3.Dot(ray.direction, normal) * normal, null);
+                }
+                if (refractionRate > 0) {
+
+                }
+                return new RTHitInfo(this, Q, normal, ray, reflection, refraction);
             }
         }
         else {

@@ -14,7 +14,7 @@ public class RTPointLight : RTLight {
         color.y = GetComponent<Light>().color.g;
         color.z = GetComponent<Light>().color.b;
         position = transform.position;
-
+        range = GetComponent<Light>().range;
     }
 
 }

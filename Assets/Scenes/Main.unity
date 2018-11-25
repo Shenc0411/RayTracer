@@ -271,8 +271,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 670cf1b09e343114cbec191808184fba, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  reflectionRate: 0.1
-  refractionRate: 0.7
+  reflectionRate: 0
+  refractionRate: 0.8
   isTransparent: 1
   Ks: {r: 1, g: 1, b: 1, a: 0}
   Kd: {r: 1, g: 1, b: 1, a: 0}
@@ -1121,7 +1121,7 @@ Transform:
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 1573865440}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.04, y: 1, z: -7.939}
+  m_LocalPosition: {x: -4.76, y: 1, z: -12.985}
   m_LocalScale: {x: 1.6, y: 0.9, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -1273,7 +1273,7 @@ Light:
   serializedVersion: 8
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 1
+  m_Intensity: 1.5
   m_Range: 6
   m_SpotAngle: 30
   m_CookieSize: 10

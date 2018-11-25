@@ -10,8 +10,6 @@ public abstract class RTHitable : MonoBehaviour {
 
     public float refractionRate;
 
-    public bool isTransparent;
-
     public Color Ks;
     public Color Kd;
     public Color Ka;

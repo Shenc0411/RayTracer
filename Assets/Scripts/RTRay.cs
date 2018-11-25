@@ -9,6 +9,7 @@ public class RTRay {
     public RTHitInfo hitInfo;
 
     public RTRay(Vector3 origin, Vector3 direction, RTHitInfo hitInfo) {
+        ++RayTracer.RAYS_SPAWNDED;
         this.origin = origin;
         this.direction = direction;
         this.hitInfo = hitInfo;

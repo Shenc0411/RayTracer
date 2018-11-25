@@ -1,6 +1,29 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Profiling;
+using System.Threading;
+
+public class TraceColorJob {
+    public int x, y;
+    public float weight;
+    public RTRay ray;
+    public TraceColorJob(int x, int y, float weight, RTRay ray) {
+        this.x = x;
+        this.y = y;
+        this.weight = weight;
+        this.ray = ray;
+    }
+}
+
+public class TraceColorThreadParameter {
+
+    public List<TraceColorJob> traceColorJobs;
+
+    public TraceColorThreadParameter(List<TraceColorJob> traceColorJobs) {
+        this.traceColorJobs = traceColorJobs;
+    }
+}
 
 public class RayTracer : MonoBehaviour {
 
@@ -13,14 +36,20 @@ public class RayTracer : MonoBehaviour {
     public RTRay[][] screenRays;
     public GameObject rendererGO;
     public Vector3[][] screenPoints;
+    public Color[][] screenPixels;
 
     public Texture2D renderTexture;
 
     public static float REFRACTION_DISTANCE = 0.00001f;
-    public static float REFRACTION_FACTOR = 0.8f;
+    public static float REFRACTION_FACTOR = 0.6f;
     public static int MAX_RAY_DEPTH = 3;
     public static float SHADOW_FACTOR = 0.1f;
-    
+
+    public static float LIGHT_INTENSITY_FACTOR = 0.8f;
+
+    public static int RAYS_SPAWNDED = 0;
+
+    public static int CPU_NUM = 12;
 
     public static Vector3[] superSampleKernalRegular = { new Vector3(-0.4f, 0.4f, 1.0f / 9.0f), new Vector3(0.0f, 0.4f, 1.0f / 9.0f), new Vector3(0.4f, 0.4f, 1.0f / 9.0f),
                                                     new Vector3(-0.4f, 0.0f, 1.0f / 9.0f), new Vector3(0.0f, 0.0f, 1.0f / 9.0f), new Vector3(0.4f, 0.0f, 1.0f / 9.0f),
@@ -92,7 +121,7 @@ public class RayTracer : MonoBehaviour {
         for (int y = 0; y < mCamera.yResolution; ++y) {
             for (int x = 0; x < mCamera.xResolution; ++x) {
                 if (screenRays != null && screenRays[y] != null) {
-                    if(x % 256 != 0 || y % 256 != 0) {
+                    if(x != 768 || y != 490) {
                         continue;
                     }
                     RenderRay(screenRays[y][x]);
@@ -148,7 +177,12 @@ public class RayTracer : MonoBehaviour {
         return new RTRay(mCamera.position, screenPoints[y][x] - mCamera.position, null);
     }
 
-    private void RayTrace() {
+    public void RayTrace() {
+
+        System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+        sw.Start();
+
+        RAYS_SPAWNDED = 0;
 
         GenerateScreenPoints();
 
@@ -156,30 +190,82 @@ public class RayTracer : MonoBehaviour {
 
         screenRays = new RTRay[mCamera.yResolution][];
 
+        List<Thread> TCThreads = new List<Thread>();
+
+        List<TraceColorJob> jobs = new List<TraceColorJob>();
+
+        int TCBatchNum = CPU_NUM;
+        int TCBatchSize = mCamera.yResolution * mCamera.xResolution / TCBatchNum;
+        int TCBatchIndex = 0;
+        int TCBatchCurrent = 0;
+        int TCBatchEnd = TCBatchSize;
+
         for (int y = 0; y < mCamera.yResolution; ++y) {
             screenRays[y] = new RTRay[mCamera.xResolution];
             for (int x = 0; x < mCamera.xResolution; ++x) {
                 screenRays[y][x] = GetScreenRay(x, y);
+
+                //if(TCBatchCurrent == TCBatchEnd) {
+
+                //    Thread thread = new Thread(new ParameterizedThreadStart(TraceColorThread));
+                //    thread.Start(jobs);
+                //    TCThreads.Add(thread);
+
+                //    TCBatchCurrent = 0;
+                //    TCBatchIndex++;
+                //    TCBatchEnd = Mathf.Min(TCBatchEnd + TCBatchSize, mCamera.yResolution * mCamera.xResolution);
+                //    jobs = new List<TraceColorJob>();
+                //}
+
+                //jobs.Add(new TraceColorJob(x, y, 1.0f, screenRays[y][x]));
+
                 Color pixel = Color.black;
-                foreach(Vector3 offset in superSampleKernals[superSampleKernalIndex]) {
+                foreach (Vector3 offset in superSampleKernals[superSampleKernalIndex]) {
                     Vector3 pos = screenPoints[y][x];
+
                     pos.x += offset.x;
                     pos.y += offset.y;
+
                     RTRay ray = new RTRay(mCamera.position, pos - mCamera.position, null);
+
                     pixel += offset.z * TraceColor(screenRays[y][x], 1);
+
                 }
                 renderTexture.SetPixel(x, mCamera.yResolution - y, pixel);
             }
         }
+
+        //foreach(Thread thread in TCThreads) {
+        //    thread.Join();
+        //}
+
+        //for (int y = 0; y < mCamera.yResolution; ++y) {
+        //    for (int x = 0; x < mCamera.xResolution; ++x) {
+        //        renderTexture.SetPixel(x, mCamera.yResolution - y, screenPixels[y][x]);
+        //    }
+        //}
 
         renderTexture.Apply();
 
         renderTexture.filterMode = FilterMode.Point;
 
         rendererGO.GetComponent<MeshRenderer>().material.SetTexture("_MainTex", renderTexture);
+
+        sw.Stop();
+
+        Debug.Log("Total Ray Spawned: " + RAYS_SPAWNDED);
+        Debug.Log("Ray Tracing Finished: " + sw.Elapsed);
+    }
+
+    private void TraceColorThread(object parameter) {
+        TraceColorThreadParameter realParameter = (TraceColorThreadParameter)parameter;
+        foreach(TraceColorJob TCJ in realParameter.traceColorJobs) {
+            screenPixels[TCJ.y][TCJ.x] = TCJ.weight * TraceColor(TCJ.ray, 1);
+        }
     }
 
     private Color TraceColor(RTRay ray, int depth) {
+        
         Color result = Color.black;
 
         if(depth > MAX_RAY_DEPTH || ray == null) {
@@ -197,12 +283,13 @@ public class RayTracer : MonoBehaviour {
             Color refractionColor = Color.black;
 
             reflectionColor = hitInfo.hitable.reflectionRate * TraceColor(hitInfo.reflection, depth + 1);
+
             refractionColor = hitInfo.hitable.refractionRate * TraceColor(hitInfo.refraction, depth + 1);
 
             float phongCoefficient = Mathf.Clamp01(1 - hitInfo.hitable.reflectionRate - hitInfo.hitable.refractionRate);
             result = phongCoefficient * lightColor + reflectionColor + refractionColor;
         }
-
+        
         return result;
     }
 
@@ -232,15 +319,15 @@ public class RayTracer : MonoBehaviour {
 
             float intensityFactor = light.intensity;
 
-            float shadowFactor = 1f;
+            RTRay lightTraceRay = new RTRay(hitInfo.hitPoint, -L, null);
 
-            RTRay lightRay = new RTRay(hitInfo.hitPoint, -L, null);
+            float shadowFactor = 1.0f;
 
             foreach (RTHitable hitable in hitables) {
                 if (hitable == hitInfo.hitable) {
                     continue;
                 }
-                RTHitInfo hit = hitable.CheckCollision(lightRay);
+                RTHitInfo hit = hitable.CheckCollision(lightTraceRay);
                 if (hit != null) {
                     shadowFactor = SHADOW_FACTOR;
                     break;
@@ -252,9 +339,11 @@ public class RayTracer : MonoBehaviour {
 
         foreach (RTPointLight light in pointLights) {
 
-            Vector3 L = (H - light.position).normalized;
+            Vector3 L = H - light.position;
 
             float distance = L.magnitude;
+
+            L.Normalize();
 
             if (distance > light.range) {
                 continue;
@@ -262,19 +351,9 @@ public class RayTracer : MonoBehaviour {
 
             float intensityFactor = light.intensity * (1.0f - distance / light.range);
 
-            float shadowFactor = 1f;
             RTRay lightRay = new RTRay(hitInfo.hitPoint, -L, null);
 
-            foreach (RTHitable hitable in hitables) {
-                if(hitable == hitInfo.hitable) {
-                    continue;
-                }
-                RTHitInfo hit = hitable.CheckCollision(lightRay);
-                if (hit != null && !hit.hitable.isTransparent) {
-                    shadowFactor = SHADOW_FACTOR;
-                    break;
-                }
-            }
+            float shadowFactor = AccumulateShadowFactor(lightRay, hitInfo.hitable, distance, light.position);
 
             result += intensityFactor * shadowFactor * PhongShadingColor(Ka, Kd, Ks, spec, N, L, E, NDotE) * light.color;
         }
@@ -283,7 +362,7 @@ public class RayTracer : MonoBehaviour {
 
         result += ambientTerm;
 
-        return result;
+        return LIGHT_INTENSITY_FACTOR * result;
     }
 
     private Color PhongShadingColor(Color Ka, Color Kd, Color Ks, float spec, Vector3 N, Vector3 L, Vector3 E, float NDotE) {
@@ -306,7 +385,7 @@ public class RayTracer : MonoBehaviour {
             return result;
         }
 
-        Vector3 R = L - 2.0f * NDotL * N;
+        Vector3 R = L + 2.0f * NDotL * N;
         R.Normalize();
         float RDotE = Mathf.Clamp01(Vector3.Dot(-R, E));
         float powedRDotE = Mathf.Pow(RDotE, spec);
@@ -315,6 +394,10 @@ public class RayTracer : MonoBehaviour {
     }
 
     private RTHitInfo GetClosetHitInfo(RTRay ray) {
+        return GetClosetHitInfo(ray, null);
+    }
+
+    private RTHitInfo GetClosetHitInfo(RTRay ray, HashSet<RTHitable> ignoreSet) {
 
         ray.direction.Normalize();
 
@@ -322,6 +405,9 @@ public class RayTracer : MonoBehaviour {
         float hitPointDistance = float.MaxValue;
 
         foreach (RTHitable hitable in hitables) {
+            if (ignoreSet != null && ignoreSet.Contains(hitable)) {
+                continue;
+            }
             RTHitInfo localHitInfo = hitable.CheckCollision(ray);
             if (localHitInfo != null) {
                 float localHitPointDistance = (localHitInfo.hitPoint - ray.origin).magnitude;
@@ -341,144 +427,32 @@ public class RayTracer : MonoBehaviour {
 
     }
 
-    private void RayTraceStep() {
+    private float AccumulateShadowFactor(RTRay lightTraceRay, RTHitable self, float LHDist, Vector3 lightPosition) {
 
-        HashSet<RTRay> raysToCheck = new HashSet<RTRay>(activeRays);
+        float shadowFactor = 1f;
 
-        foreach(RTRay ray in raysToCheck) {
+        lightTraceRay.direction.Normalize();
 
-            ray.direction.Normalize();
-
-            RTHitInfo hitInfo = null;
-            float hitPointDistance = float.MaxValue;
-
-            foreach(RTHitable hitable in hitables) {
-                RTHitInfo localHitInfo = hitable.CheckCollision(ray);
-                if (localHitInfo != null) {
-                    if(hitInfo == null) {
-                        hitInfo = localHitInfo;
-                    }
-                    else {
-                        float localHitPointDistance = (localHitInfo.hitPoint - ray.origin).magnitude;
-                        if(localHitPointDistance < hitPointDistance) {
-                            hitInfo = localHitInfo;
-                        }
-                    }
-                }
+        foreach (RTHitable hitable in hitables) {
+            if (hitable == self) {
+                continue;
             }
+            RTHitInfo localHitInfo = hitable.CheckCollision(lightTraceRay);
+            if (localHitInfo != null) {
 
-            activeRays.Remove(ray);
-         
-            if (hitInfo != null) {
-                ray.hitInfo = hitInfo;
-                if(hitInfo.reflection != null) {
-                    activeRays.Add(hitInfo.reflection);
+                Vector3 localH = localHitInfo.hitPoint;
+                Vector3 localLH = localH - lightPosition;
+
+                if(Vector3.Dot(localLH, -lightTraceRay.direction) > 0 && localLH.magnitude < LHDist) {
+                    shadowFactor *= Mathf.Clamp01(localHitInfo.hitable.refractionRate + SHADOW_FACTOR);
                 }
-                if(hitInfo.refraction != null) {
-                    activeRays.Add(hitInfo.refraction);
-                }
+
             }
         }
 
+        return shadowFactor;
+
     }
-
-
-    //private Vector3 TraceRayColor(RTRay ray) {
-    //    Vector3 result = Vector3.zero;
-
-    //    if (ray.hitInfo != null) {
-    //        result.x += GatherLightColor(ray.hitInfo).x + ray.hitInfo.hitable.albedo.x;
-    //        result.y += GatherLightColor(ray.hitInfo).y + ray.hitInfo.hitable.albedo.y;
-    //        result.z += GatherLightColor(ray.hitInfo).z + ray.hitInfo.hitable.albedo.z;
-    //        if (ray.hitInfo.reflection != null) {
-    //            result += ray.hitInfo.hitable.reflectionRate * TraceRayColor(ray.hitInfo.reflection);
-    //        }
-    //        if (ray.hitInfo.refraction != null) {
-    //            result += ray.hitInfo.hitable.refractionRate * TraceRayColor(ray.hitInfo.refraction);
-    //        }
-    //    }
-
-    //    return result;
-    //}
-
-    //private Vector3 GatherLightColor(RTHitInfo hitInfo) {
-
-    //    Vector3 result = Vector3.zero;
-
-    //    foreach (RTDirectionalLight light in directionalLights) {
-
-    //        bool isInShadow = false;
-    //        RTRay lightRay = new RTRay(hitInfo.hitPoint, -light.direction, null);
-
-    //        foreach (RTHitable hitable in hitables) {
-    //            RTHitInfo local = hitable.CheckCollision(lightRay);
-    //            if (local != null) {
-    //                isInShadow = true;
-    //                break;
-    //            }
-    //        }
-
-    //        if (isInShadow) {
-    //            continue;
-    //        }
-
-    //        float lightDirDotNormal = Vector3.Dot(light.direction, hitInfo.hitPointNormal);
-    //        float rayDirDotNormal = Vector3.Dot(hitInfo.hitRay.direction, hitInfo.hitPointNormal);
-    //        RTHitable hit = hitInfo.hitable;
-
-    //        Lambertian Term
-    //        float lambertianTerm = hit.lambertCoefficient * lightDirDotNormal;
-
-    //        Phong Term
-    //        float reflect = 2.0f * rayDirDotNormal;
-    //        Vector3 phongDirection = hitInfo.hitRay.direction - reflect * hitInfo.hitPointNormal;
-    //        float phongTerm = Mathf.Max(Vector3.Dot(phongDirection, hitInfo.hitRay.direction), 0f);
-    //        phongTerm = hit.reflectionRate * Mathf.Pow(phongTerm, hit.phongPower) * hit.phongCoefficient;
-
-    //        Blinn - Phong Term
-    //        float blinnTerm = 0f;
-    //        Vector3 blinnDirection = -light.direction - hitInfo.hitRay.direction;
-    //        float temp = Mathf.Sqrt(Vector3.Dot(blinnDirection, blinnDirection));
-    //        if (temp > 0f) {
-    //            blinnDirection = (1f / temp) * blinnDirection;
-    //            blinnTerm = Mathf.Max(Vector3.Dot(blinnDirection, hitInfo.hitPointNormal), 0f);
-    //            blinnTerm = hit.reflectionRate * Mathf.Pow(blinnTerm, hit.blinnPhongPower) * hit.blinnPhongCoefficient;
-    //        }
-
-    //        result += light.color * light.intensity * (lambertianTerm + phongTerm + blinnTerm);
-    //    }
-
-    //    foreach (RTPointLight light in pointLights) {
-    //        float distance = (hitInfo.hitPoint - light.position).magnitude;
-
-    //        if (distance > light.range) {
-    //            continue;
-    //        }
-
-    //        bool isInShadow = false;
-    //        RTRay lightRay = new RTRay(light.position, hitInfo.hitPoint - light.position, null);
-
-    //        foreach (RTHitable hitable in hitables) {
-    //            RTHitInfo local = hitable.CheckCollision(lightRay);
-    //            if (local != null) {
-    //                float newDist = (local.hitPoint - light.position).magnitude;
-    //                if (newDist < distance) {
-    //                    isInShadow = true;
-    //                    break;
-    //                }
-    //            }
-    //        }
-
-    //        float intensity = isInShadow ? 0 : light.intensity / (light.range - distance + 1);
-
-    //        result.x += light.color.x * intensity;
-    //        result.y += light.color.y * intensity;
-    //        result.z += light.color.z * intensity;
-
-    //    }
-
-    //    return result;
-    //}
 
     private void OnGUI() {
         GUI.DrawTexture(new Rect(0, 0, mCamera.xResolution, mCamera.yResolution), renderTexture);

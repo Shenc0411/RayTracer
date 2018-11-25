@@ -16,8 +16,20 @@ public class RayTracer : MonoBehaviour {
 
     public Texture2D renderTexture;
 
-    public static float EPS = float.Epsilon;
-    public static int MAX_RAY_DEPTH = 2;
+    public static float REFRACTION_DISTANCE = 0.00001f;
+    public static float REFRACTION_FACTOR = 0.8f;
+    public static int MAX_RAY_DEPTH = 3;
+    public static float SHADOW_FACTOR = 0.1f;
+    
+
+    public static Vector3[] superSampleKernalRegular = { new Vector3(-0.4f, 0.4f, 1.0f / 9.0f), new Vector3(0.0f, 0.4f, 1.0f / 9.0f), new Vector3(0.4f, 0.4f, 1.0f / 9.0f),
+                                                    new Vector3(-0.4f, 0.0f, 1.0f / 9.0f), new Vector3(0.0f, 0.0f, 1.0f / 9.0f), new Vector3(0.4f, 0.0f, 1.0f / 9.0f),
+                                                    new Vector3(-0.4f, -0.4f, 1.0f / 9.0f), new Vector3(0.0f, -0.4f, 1.0f / 9.0f), new Vector3(0.4f, -0.4f, 1.0f / 9.0f)};
+    public static Vector3[] nonSuperSampleKernal = { new Vector3(0f, 0f, 1f)};
+
+    public static Vector3[][] superSampleKernals = { nonSuperSampleKernal, superSampleKernalRegular };
+
+    public static int superSampleKernalIndex = 0;
 
     private void Awake() {
 
@@ -79,7 +91,10 @@ public class RayTracer : MonoBehaviour {
     private void RenderRays() {
         for (int y = 0; y < mCamera.yResolution; ++y) {
             for (int x = 0; x < mCamera.xResolution; ++x) {
-                if (screenRays != null && screenRays[y] != null && x % 32 == 0 && y % 32 == 0) {
+                if (screenRays != null && screenRays[y] != null) {
+                    if(x % 256 != 0 || y % 256 != 0) {
+                        continue;
+                    }
                     RenderRay(screenRays[y][x]);
                 }
             }
@@ -92,8 +107,8 @@ public class RayTracer : MonoBehaviour {
         }
         if (ray.hitInfo != null) {
             Debug.DrawLine(ray.origin, ray.hitInfo.hitPoint, Color.red);
-            RenderRay(ray.hitInfo.reflection);
-            //Debug.DrawRay(ray.hitInfo.reflection.origin, ray.hitInfo.reflection.direction, Color.green);
+            //RenderRay(ray.hitInfo.reflection);
+            RenderRay(ray.hitInfo.refraction);
             Debug.DrawRay(ray.hitInfo.hitPoint, ray.hitInfo.hitPointNormal, Color.blue);
         }
         else {
@@ -145,21 +160,17 @@ public class RayTracer : MonoBehaviour {
             screenRays[y] = new RTRay[mCamera.xResolution];
             for (int x = 0; x < mCamera.xResolution; ++x) {
                 screenRays[y][x] = GetScreenRay(x, y);
-                renderTexture.SetPixel(x, y, TraceColor(screenRays[y][x], 1));
+                Color pixel = Color.black;
+                foreach(Vector3 offset in superSampleKernals[superSampleKernalIndex]) {
+                    Vector3 pos = screenPoints[y][x];
+                    pos.x += offset.x;
+                    pos.y += offset.y;
+                    RTRay ray = new RTRay(mCamera.position, pos - mCamera.position, null);
+                    pixel += offset.z * TraceColor(screenRays[y][x], 1);
+                }
+                renderTexture.SetPixel(x, mCamera.yResolution - y, pixel);
             }
         }
-
-        //for (int i = 0; i < MAX_RAY_DEPTH; ++i) {
-        //    RayTraceStep();
-        //}
-
-        //for (int y = 0; y < mCamera.yResolution; ++y) {
-        //    for (int x = 0; x < mCamera.xResolution; ++x) {
-        //        Vector3 colorVals = TraceRayColor(screenRays[y][x]);
-        //        Color color = new Color(colorVals.x, colorVals.y, colorVals.z, 1);
-        //        renderTexture.SetPixel(x, y, color);
-        //    }
-        //}
 
         renderTexture.Apply();
 
@@ -171,77 +182,134 @@ public class RayTracer : MonoBehaviour {
     private Color TraceColor(RTRay ray, int depth) {
         Color result = Color.black;
 
-        if(depth > MAX_RAY_DEPTH) {
+        if(depth > MAX_RAY_DEPTH || ray == null) {
             return result;
         }
 
         RTHitInfo hitInfo = GetClosetHitInfo(ray);
 
-        if(hitInfo != null) {
-            
+        if (hitInfo != null) {
+
             ray.hitInfo = hitInfo;
 
-            Color albedoColor = new Color(hitInfo.hitable.albedo.x, hitInfo.hitable.albedo.y, hitInfo.hitable.albedo.z);
+            Color lightColor = TraceLightColor(hitInfo);
+            Color reflectionColor = Color.black;
+            Color refractionColor = Color.black;
 
-            Color lightColor = TraceLight(hitInfo);
+            reflectionColor = hitInfo.hitable.reflectionRate * TraceColor(hitInfo.reflection, depth + 1);
+            refractionColor = hitInfo.hitable.refractionRate * TraceColor(hitInfo.refraction, depth + 1);
 
-            result = albedoColor + lightColor;
-
+            float phongCoefficient = Mathf.Clamp01(1 - hitInfo.hitable.reflectionRate - hitInfo.hitable.refractionRate);
+            result = phongCoefficient * lightColor + reflectionColor + refractionColor;
         }
 
         return result;
     }
 
-    private Color TraceLight(RTHitInfo hitInfo) {
+    private Color TraceLightColor(RTHitInfo hitInfo) {
+
         Color result = Color.black;
+
+        Color ambientTerm = Color.black; 
+        
+        hitInfo.hitPointNormal.Normalize();
+        hitInfo.hitRay.direction.Normalize();
+        Vector3 N = hitInfo.hitPointNormal;
+        Vector3 E = hitInfo.hitRay.direction;
+        Vector3 H = hitInfo.hitPoint;
+
+        float NDotE = Vector3.Dot(N, -E);
+
+        Color Kd = hitInfo.hitable.Kd;
+        Color Ks = hitInfo.hitable.Ks;
+        Color Ka = hitInfo.hitable.Ka;
+
+        float spec = hitInfo.hitable.spec;
 
         foreach (RTDirectionalLight light in directionalLights) {
 
-            //bool isInShadow = false;
-            //RTRay lightRay = new RTRay(hitInfo.hitPoint, -light.direction, null);
+            Vector3 L = light.direction;
+
+            float intensityFactor = light.intensity;
+
+            float shadowFactor = 1f;
+            //RTRay lightRay = new RTRay(hitInfo.hitPoint, -L, null);
 
             //foreach (RTHitable hitable in hitables) {
-            //    RTHitInfo local = hitable.CheckCollision(lightRay);
-            //    if (local != null) {
-            //        isInShadow = true;
+            //    RTHitInfo hit = hitable.CheckCollision(lightRay);
+            //    if (hit != null) {
+            //        shadowFactor = SHADOW_FACTOR;
             //        break;
             //    }
             //}
 
-            //if (isInShadow) {
-            //    continue;
-            //}
+            //Color local = Color.black;
 
-            Vector3 lightDir = -light.direction.normalized;
-
-            float lightDirDotNormal = Vector3.Dot(lightDir, hitInfo.hitPointNormal);
-            float rayDirDotNormal = Vector3.Dot(hitInfo.hitRay.direction, hitInfo.hitPointNormal);
-            RTHitable hit = hitInfo.hitable;
-
-            //Lambertian Term
-            float lambertianTerm = hit.lambertCoefficient * lightDirDotNormal;
-
-            //Phong Term
-            float reflect = 2.0f * rayDirDotNormal;
-            Vector3 phongDirection = hitInfo.hitRay.direction - reflect * hitInfo.hitPointNormal;
-            float phongTerm = Mathf.Max(Vector3.Dot(phongDirection, hitInfo.hitRay.direction), 0f);
-            phongTerm = hit.reflectionRate * Mathf.Pow(phongTerm, hit.phongPower) * hit.phongCoefficient;
-
-            //Blinn-Phong Term
-            float blinnTerm = 0f;
-            Vector3 blinnDirection = lightDir - hitInfo.hitRay.direction;
-            float temp = Mathf.Sqrt(Vector3.Dot(blinnDirection, blinnDirection));
-            if (temp > 0f) {
-                blinnDirection = (1f / temp) * blinnDirection;
-                blinnTerm = Mathf.Max(Vector3.Dot(blinnDirection, hitInfo.hitPointNormal), 0f);
-                blinnTerm = hit.reflectionRate * Mathf.Pow(blinnTerm, hit.blinnPhongPower) * hit.blinnPhongCoefficient;
-            }
-
-            Vector3 termVal = light.color * light.intensity * (lambertianTerm + phongTerm + blinnTerm);
-            result += new Color(termVal.x, termVal.y, termVal.z);
+            result += intensityFactor * shadowFactor * PhongShadingColor(Ka, Kd, Ks, spec, N, L, E, NDotE) * light.color;
         }
 
+        foreach (RTPointLight light in pointLights) {
+
+            Vector3 L = (H - light.position).normalized;
+
+            float distance = L.magnitude;
+
+            if (distance > light.range) {
+                continue;
+            }
+
+            float intensityFactor = light.intensity * (1.0f - distance / light.range);
+
+            float shadowFactor = 1f;
+            RTRay lightRay = new RTRay(hitInfo.hitPoint, -L, null);
+
+            foreach (RTHitable hitable in hitables) {
+                if(hitable == hitInfo.hitable) {
+                    continue;
+                }
+                RTHitInfo hit = hitable.CheckCollision(lightRay);
+                if (hit != null && !hit.hitable.isTransparent) {
+                    shadowFactor = SHADOW_FACTOR;
+                    break;
+                }
+            }
+
+            result += intensityFactor * shadowFactor * PhongShadingColor(Ka, Kd, Ks, spec, N, L, E, NDotE) * light.color;
+        }
+
+        ambientTerm = (mCamera.ambientLightColor * mCamera.ambientLightIntensity) * Ka;
+
+        result += ambientTerm;
+
         return result;
+    }
+
+    private Color PhongShadingColor(Color Ka, Color Kd, Color Ks, float spec, Vector3 N, Vector3 L, Vector3 E, float NDotE) {
+
+        Color result = Color.black;
+
+        Color local = Color.black;
+
+        float NDotL = Vector3.Dot(N, -L);
+
+        if (NDotE > 0 && NDotL > 0) {
+
+        }
+        else if (NDotE < 0 && NDotL < 0) {
+            N = -N;
+            NDotL = -NDotL;
+            NDotE = -NDotE;
+        }
+        else {
+            return result;
+        }
+
+        Vector3 R = L - 2.0f * NDotL * N;
+        R.Normalize();
+        float RDotE = Mathf.Clamp01(Vector3.Dot(-R, E));
+        float powedRDotE = Mathf.Pow(RDotE, spec);
+
+        return NDotL * Kd + powedRDotE * Ks;
     }
 
     private RTHitInfo GetClosetHitInfo(RTRay ray) {
@@ -254,11 +322,12 @@ public class RayTracer : MonoBehaviour {
         foreach (RTHitable hitable in hitables) {
             RTHitInfo localHitInfo = hitable.CheckCollision(ray);
             if (localHitInfo != null) {
+                float localHitPointDistance = (localHitInfo.hitPoint - ray.origin).magnitude;
                 if (hitInfo == null) {
                     hitInfo = localHitInfo;
+                    hitPointDistance = localHitPointDistance;
                 }
                 else {
-                    float localHitPointDistance = (localHitInfo.hitPoint - ray.origin).magnitude;
                     if (localHitPointDistance < hitPointDistance) {
                         hitInfo = localHitInfo;
                     }
@@ -312,101 +381,105 @@ public class RayTracer : MonoBehaviour {
     }
 
 
-    private Vector3 TraceRayColor(RTRay ray) {
-        Vector3 result = Vector3.zero;
+    //private Vector3 TraceRayColor(RTRay ray) {
+    //    Vector3 result = Vector3.zero;
 
-        if (ray.hitInfo != null) {
-            result.x += GatherLightColor(ray.hitInfo).x + ray.hitInfo.hitable.albedo.x;
-            result.y += GatherLightColor(ray.hitInfo).y + ray.hitInfo.hitable.albedo.y;
-            result.z += GatherLightColor(ray.hitInfo).z + ray.hitInfo.hitable.albedo.z;
-            if (ray.hitInfo.reflection != null) {
-                result += ray.hitInfo.hitable.reflectionRate * TraceRayColor(ray.hitInfo.reflection);
-            }
-            if (ray.hitInfo.refraction != null) {
-                result += ray.hitInfo.hitable.refractionRate * TraceRayColor(ray.hitInfo.refraction);
-            }
-        }
+    //    if (ray.hitInfo != null) {
+    //        result.x += GatherLightColor(ray.hitInfo).x + ray.hitInfo.hitable.albedo.x;
+    //        result.y += GatherLightColor(ray.hitInfo).y + ray.hitInfo.hitable.albedo.y;
+    //        result.z += GatherLightColor(ray.hitInfo).z + ray.hitInfo.hitable.albedo.z;
+    //        if (ray.hitInfo.reflection != null) {
+    //            result += ray.hitInfo.hitable.reflectionRate * TraceRayColor(ray.hitInfo.reflection);
+    //        }
+    //        if (ray.hitInfo.refraction != null) {
+    //            result += ray.hitInfo.hitable.refractionRate * TraceRayColor(ray.hitInfo.refraction);
+    //        }
+    //    }
 
-        return result;
-    }
+    //    return result;
+    //}
 
-    private Vector3 GatherLightColor(RTHitInfo hitInfo) {
+    //private Vector3 GatherLightColor(RTHitInfo hitInfo) {
 
-        Vector3 result = Vector3.zero;
+    //    Vector3 result = Vector3.zero;
 
-        foreach (RTDirectionalLight light in directionalLights) {
+    //    foreach (RTDirectionalLight light in directionalLights) {
 
-            bool isInShadow = false;
-            RTRay lightRay = new RTRay(hitInfo.hitPoint, -light.direction, null);
+    //        bool isInShadow = false;
+    //        RTRay lightRay = new RTRay(hitInfo.hitPoint, -light.direction, null);
 
-            foreach (RTHitable hitable in hitables) {
-                RTHitInfo local = hitable.CheckCollision(lightRay);
-                if (local != null) {
-                    isInShadow = true;
-                    break;
-                }
-            }
+    //        foreach (RTHitable hitable in hitables) {
+    //            RTHitInfo local = hitable.CheckCollision(lightRay);
+    //            if (local != null) {
+    //                isInShadow = true;
+    //                break;
+    //            }
+    //        }
 
-            if (isInShadow) {
-                continue;
-            }
+    //        if (isInShadow) {
+    //            continue;
+    //        }
 
-            float lightDirDotNormal = Vector3.Dot(light.direction, hitInfo.hitPointNormal);
-            float rayDirDotNormal = Vector3.Dot(hitInfo.hitRay.direction, hitInfo.hitPointNormal);
-            RTHitable hit = hitInfo.hitable;
+    //        float lightDirDotNormal = Vector3.Dot(light.direction, hitInfo.hitPointNormal);
+    //        float rayDirDotNormal = Vector3.Dot(hitInfo.hitRay.direction, hitInfo.hitPointNormal);
+    //        RTHitable hit = hitInfo.hitable;
 
-            //Lambertian Term
-            float lambertianTerm = hit.lambertCoefficient * lightDirDotNormal;
+    //        Lambertian Term
+    //        float lambertianTerm = hit.lambertCoefficient * lightDirDotNormal;
 
-            //Phong Term
-            float reflect = 2.0f * rayDirDotNormal;
-            Vector3 phongDirection = hitInfo.hitRay.direction - reflect * hitInfo.hitPointNormal;
-            float phongTerm = Mathf.Max(Vector3.Dot(phongDirection, hitInfo.hitRay.direction), 0f);
-            phongTerm = hit.reflectionRate * Mathf.Pow(phongTerm, hit.phongPower) * hit.phongCoefficient;
+    //        Phong Term
+    //        float reflect = 2.0f * rayDirDotNormal;
+    //        Vector3 phongDirection = hitInfo.hitRay.direction - reflect * hitInfo.hitPointNormal;
+    //        float phongTerm = Mathf.Max(Vector3.Dot(phongDirection, hitInfo.hitRay.direction), 0f);
+    //        phongTerm = hit.reflectionRate * Mathf.Pow(phongTerm, hit.phongPower) * hit.phongCoefficient;
 
-            //Blinn-Phong Term
-            float blinnTerm = 0f;
-            Vector3 blinnDirection = -light.direction - hitInfo.hitRay.direction;
-            float temp = Mathf.Sqrt(Vector3.Dot(blinnDirection, blinnDirection));
-            if (temp > 0f) {
-                blinnDirection = (1f / temp) * blinnDirection;
-                blinnTerm = Mathf.Max(Vector3.Dot(blinnDirection, hitInfo.hitPointNormal), 0f);
-                blinnTerm = hit.reflectionRate * Mathf.Pow(blinnTerm, hit.blinnPhongPower) * hit.blinnPhongCoefficient;
-            }
+    //        Blinn - Phong Term
+    //        float blinnTerm = 0f;
+    //        Vector3 blinnDirection = -light.direction - hitInfo.hitRay.direction;
+    //        float temp = Mathf.Sqrt(Vector3.Dot(blinnDirection, blinnDirection));
+    //        if (temp > 0f) {
+    //            blinnDirection = (1f / temp) * blinnDirection;
+    //            blinnTerm = Mathf.Max(Vector3.Dot(blinnDirection, hitInfo.hitPointNormal), 0f);
+    //            blinnTerm = hit.reflectionRate * Mathf.Pow(blinnTerm, hit.blinnPhongPower) * hit.blinnPhongCoefficient;
+    //        }
 
-            result += light.color * light.intensity * (lambertianTerm + phongTerm + blinnTerm);
-        }
+    //        result += light.color * light.intensity * (lambertianTerm + phongTerm + blinnTerm);
+    //    }
 
-        //foreach (RTPointLight light in pointLights) {
-        //    float distance = (hitInfo.hitPoint - light.position).magnitude;
+    //    foreach (RTPointLight light in pointLights) {
+    //        float distance = (hitInfo.hitPoint - light.position).magnitude;
 
-        //    if (distance > light.range) {
-        //        continue;
-        //    }
+    //        if (distance > light.range) {
+    //            continue;
+    //        }
 
-        //    bool isInShadow = false;
-        //    RTRay lightRay = new RTRay(light.position, hitInfo.hitPoint - light.position, null);
+    //        bool isInShadow = false;
+    //        RTRay lightRay = new RTRay(light.position, hitInfo.hitPoint - light.position, null);
 
-        //    foreach (RTHitable hitable in hitables) {
-        //        RTHitInfo local = hitable.CheckCollision(lightRay);
-        //        if (local != null) {
-        //            float newDist = (local.hitPoint - light.position).magnitude;
-        //            if (newDist < distance) {
-        //                isInShadow = true;
-        //                break;
-        //            }
-        //        }
-        //    }
+    //        foreach (RTHitable hitable in hitables) {
+    //            RTHitInfo local = hitable.CheckCollision(lightRay);
+    //            if (local != null) {
+    //                float newDist = (local.hitPoint - light.position).magnitude;
+    //                if (newDist < distance) {
+    //                    isInShadow = true;
+    //                    break;
+    //                }
+    //            }
+    //        }
 
-        //    float intensity = isInShadow ? 0 : light.intensity / (light.range - distance + 1);
+    //        float intensity = isInShadow ? 0 : light.intensity / (light.range - distance + 1);
 
-        //    result.x += light.color.x * intensity;
-        //    result.y += light.color.y * intensity;
-        //    result.z += light.color.z * intensity;
+    //        result.x += light.color.x * intensity;
+    //        result.y += light.color.y * intensity;
+    //        result.z += light.color.z * intensity;
 
-        //}
+    //    }
 
-        return result;
+    //    return result;
+    //}
+
+    private void OnGUI() {
+        GUI.DrawTexture(new Rect(0, 0, mCamera.xResolution, mCamera.yResolution), renderTexture);
     }
 
 }

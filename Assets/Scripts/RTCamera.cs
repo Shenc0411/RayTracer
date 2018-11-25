@@ -7,15 +7,22 @@ public class RTCamera : MonoBehaviour {
     public Vector3 position;
     public Vector3 direction;
 
-    public int xResolution = 256;
-    public int yResolution = 256;
+    public int xResolution;
+    public int yResolution;
 
     public float nearPlaneDistance;
 
+    public Color ambientLightColor;
+    public float ambientLightIntensity;
+
     private void Awake() {
+
+        xResolution = Screen.width;
+        yResolution = Screen.height;
+
         position = transform.position;
         direction = transform.forward;
-        nearPlaneDistance = GetComponent<Camera>().nearClipPlane + 0.1f;
+        nearPlaneDistance = GetComponent<Camera>().nearClipPlane;
     }
 
 }

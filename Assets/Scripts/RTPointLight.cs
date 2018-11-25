@@ -10,9 +10,7 @@ public class RTPointLight : RTLight {
     private void Awake() {
 
         intensity = GetComponent<Light>().intensity;
-        color.x = GetComponent<Light>().color.r;
-        color.y = GetComponent<Light>().color.g;
-        color.z = GetComponent<Light>().color.b;
+        color = GetComponent<Light>().color;
         position = transform.position;
         range = GetComponent<Light>().range;
     }

@@ -8,17 +8,15 @@ public abstract class RTHitable : MonoBehaviour {
 
     public float reflectionRate;
 
-    public float lambertCoefficient;
-
-    public float phongPower;
-    public float phongCoefficient;
-
-    public float blinnPhongPower;
-    public float blinnPhongCoefficient;
-
     public float refractionRate;
 
-    public Vector3 albedo;
+    public bool isTransparent;
+
+    public Color Ks;
+    public Color Kd;
+    public Color Ka;
+
+    public float spec;
 
     public Vector3 position;
 

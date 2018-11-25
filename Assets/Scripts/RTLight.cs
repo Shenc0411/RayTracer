@@ -8,6 +8,6 @@ public enum LightType { Directional, Point }
 public abstract class RTLight : MonoBehaviour {
 
     public float intensity;
-    public Vector3 color;
+    public Color color;
 
 }

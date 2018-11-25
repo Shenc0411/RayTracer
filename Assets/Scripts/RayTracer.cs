@@ -233,17 +233,19 @@ public class RayTracer : MonoBehaviour {
             float intensityFactor = light.intensity;
 
             float shadowFactor = 1f;
-            //RTRay lightRay = new RTRay(hitInfo.hitPoint, -L, null);
 
-            //foreach (RTHitable hitable in hitables) {
-            //    RTHitInfo hit = hitable.CheckCollision(lightRay);
-            //    if (hit != null) {
-            //        shadowFactor = SHADOW_FACTOR;
-            //        break;
-            //    }
-            //}
+            RTRay lightRay = new RTRay(hitInfo.hitPoint, -L, null);
 
-            //Color local = Color.black;
+            foreach (RTHitable hitable in hitables) {
+                if (hitable == hitInfo.hitable) {
+                    continue;
+                }
+                RTHitInfo hit = hitable.CheckCollision(lightRay);
+                if (hit != null) {
+                    shadowFactor = SHADOW_FACTOR;
+                    break;
+                }
+            }
 
             result += intensityFactor * shadowFactor * PhongShadingColor(Ka, Kd, Ks, spec, N, L, E, NDotE) * light.color;
         }

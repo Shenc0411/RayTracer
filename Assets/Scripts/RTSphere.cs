@@ -24,22 +24,22 @@ public class RTSphere : RTHitable {
             Vector3 Q = ray.origin + (OPDist + PQDist) * ray.direction; //Actual Hitpoint
             Vector3 normal = (position - Q).normalized;
 
-            Vector3 refractionHitPoint = Q - normal * RayTracer.HIT_POINT_OFFSET;
-            Vector3 hitPoint = Q + normal * RayTracer.HIT_POINT_OFFSET;
-
             RTRay reflection = null;
             RTRay refraction = null;
 
-            float dirDotNormal = Vector3.Dot(ray.direction, normal);
-
-            Vector3 normalProjVec = normal * dirDotNormal;
-            Vector3 othroNomralProjVec = ray.direction - normal * dirDotNormal;
-
             if (reflectionRate > 0) {
+                Vector3 hitPoint = Q + normal * RayTracer.HIT_POINT_OFFSET;
+                float dirDotNormal = Vector3.Dot(ray.direction, normal);
+                Vector3 normalProjVec = normal * dirDotNormal;
                 Vector3 reflectionDir = ray.direction - 2.0f * normalProjVec;
                 reflection = new RTRay(hitPoint, reflectionDir, null);
             }
             if (refractionRate > 0) {
+                float dirDotNormal = Vector3.Dot(ray.direction, normal);
+                Vector3 normalProjVec = normal * dirDotNormal;
+                Vector3 othroNomralProjVec = ray.direction - normalProjVec;
+
+                Vector3 refractionHitPoint = Q - normal * RayTracer.HIT_POINT_OFFSET;
                 Vector3 refractionDir = normalProjVec + othroNomralProjVec * RayTracer.REFRACTION_FACTOR;
                 refraction = new RTRay(refractionHitPoint, refractionDir, null);
             }
@@ -75,7 +75,7 @@ public class RTSphere : RTHitable {
                 float dirDotNormal = Vector3.Dot(ray.direction, normal);
 
                 Vector3 normalProjVec = normal * dirDotNormal;
-                Vector3 othroNomralProjVec = ray.direction - normal * dirDotNormal;
+                Vector3 othroNomralProjVec = ray.direction - normalProjVec;
 
                 if (reflectionRate > 0) {
                     Vector3 reflectionDir = ray.direction - 2.0f * normalProjVec;

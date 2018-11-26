@@ -4,12 +4,12 @@ using UnityEngine;
 
 public class RTHitInfo {
 
-    public Vector3 hitPoint;
-    public Vector3 hitPointNormal;
-    public RTHitable hitable;
-    public RTRay reflection;
-    public RTRay refraction;
-    public RTRay hitRay;
+    public readonly Vector3 hitPoint;
+    public readonly Vector3 hitPointNormal;
+    public readonly RTHitable hitable;
+    public readonly RTRay reflection;
+    public readonly RTRay refraction;
+    public readonly RTRay hitRay;
 
     public RTHitInfo(RTHitable hitable, Vector3 hitPoint, Vector3 hitPointNormal, RTRay hitRay, RTRay reflection, RTRay refraction) {
         this.hitable = hitable;

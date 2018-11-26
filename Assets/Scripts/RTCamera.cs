@@ -11,9 +11,12 @@ public class RTCamera : MonoBehaviour {
     public int yResolution;
 
     public float nearPlaneDistance;
+    public float FOV;
 
     public Color ambientLightColor;
     public float ambientLightIntensity;
+
+    
 
     private void Awake() {
 
@@ -23,6 +26,7 @@ public class RTCamera : MonoBehaviour {
         position = transform.position;
         direction = transform.forward;
         nearPlaneDistance = GetComponent<Camera>().nearClipPlane;
+        FOV = GetComponent<Camera>().fieldOfView;
     }
 
 }

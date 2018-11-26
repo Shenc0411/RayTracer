@@ -76,14 +76,15 @@ public class RayTracer : MonoBehaviour {
     private void Update() {
 
         //RenderRays();
-        RenderScreenPlane();
+        //RenderScreenPlane();
 
     }
 
     private void RenderScreenPlane() {
 
-        float realHalfY = 0.25f;
+        float realHalfY = Mathf.Tan(Mathf.Deg2Rad * mCamera.FOV / 2.0f) * mCamera.nearPlaneDistance;
         float realHalfX = realHalfY * mCamera.xResolution / mCamera.yResolution;
+
 
         int halfXRes = mCamera.xResolution / 2;
         int halfYRes = mCamera.yResolution / 2;
@@ -132,7 +133,7 @@ public class RayTracer : MonoBehaviour {
 
         screenPoints = new Vector3[mCamera.yResolution][];
 
-        float realHalfY = 0.25f;
+        float realHalfY = Mathf.Tan(Mathf.Deg2Rad * mCamera.FOV / 2.0f) * mCamera.nearPlaneDistance;
         float realHalfX = realHalfY * mCamera.xResolution / mCamera.yResolution;
 
         int halfXRes = mCamera.xResolution / 2;
@@ -205,8 +206,6 @@ public class RayTracer : MonoBehaviour {
                         pixel += offset.z * TraceColor(screenRays[y][x], 1);
 
                     }
-
-                    //pixel = TraceColor(screenRays[y][x], 1);
 
                     renderTexture.SetPixel(x, mCamera.yResolution - y - 1, pixel);
                 }

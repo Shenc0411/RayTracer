@@ -9,8 +9,6 @@ public class RTQuad : RTHitable {
     public float ABLengthSquared, ACLengthSquared;
     public Vector3 planeNormal;
 
-    public HashSet<RTHitInfo> hitToRender;
-
     private void Awake() {
         position = transform.position;
 
@@ -37,8 +35,6 @@ public class RTQuad : RTHitable {
 
         ABLengthSquared = Vector3.Dot(AB, AB);
         ACLengthSquared = Vector3.Dot(AC, AC);
-
-        hitToRender = new HashSet<RTHitInfo>();
     }
 
     private void Update() {
@@ -61,11 +57,6 @@ public class RTQuad : RTHitable {
         //Debug.DrawLine(B, C, Color.green);
         //Debug.DrawLine(C, A, Color.green);
         //Debug.DrawRay(position, planeNormal, Color.blue);
-
-        foreach(RTHitInfo hit in hitToRender) {
-            Debug.DrawLine(hit.hitRay.origin, hit.hitPoint, Color.red);
-            Debug.DrawRay(hit.hitPoint, hit.hitPointNormal, Color.blue);
-        }
 
     }
 
@@ -100,10 +91,6 @@ public class RTQuad : RTHitable {
             //Collision Detected
 
             RTHitInfo hitinfo = new RTHitInfo(this, I, N, ray);
-
-            //if(reflectionRate > 0 && Random.Range(0, 1000) > 998) {
-            //    hitToRender.Add(hitinfo);
-            //}
 
             return hitinfo;
 

@@ -36,7 +36,7 @@ public class RayTracer : MonoBehaviour {
 
     public static Vector3[][] superSampleKernals = { nonSuperSampleKernal, superSampleKernal };
 
-    public int superSampleKernalIndex = 0;
+    public static int superSampleKernalIndex = 0;
 
     public float DIRECTIONAL_LIGHT_DISTANCE = 1000f;
     public float HIT_POINT_OFFSET = 0.00001f;
@@ -47,8 +47,9 @@ public class RayTracer : MonoBehaviour {
     public bool multiThreadMode = true;
     public bool renderShadows = true;
     public int CPU_NUM = 12;
+    public bool enableSuperSampling = true;
 
-    public float xScale, yScale;
+    public static float xScale, yScale;
 
     private void Awake() {
 
@@ -171,6 +172,8 @@ public class RayTracer : MonoBehaviour {
 
         int TCBatchNum = CPU_NUM;
         int TCBatchSize = mCamera.yResolution * mCamera.xResolution * superSampleKernals[superSampleKernalIndex].Length / TCBatchNum;
+
+        superSampleKernalIndex = enableSuperSampling ? 1 : 0;
 
         for (int y = 0; y < mCamera.yResolution; ++y) {
             screenRays[y] = new RTRay[mCamera.xResolution];
@@ -320,15 +323,13 @@ public class RayTracer : MonoBehaviour {
                 continue;
             }
 
-            L = L / distance;
-
             float intensityFactor = light.intensity * (1.0f - distance / light.range);
 
             RTRay lightRay = new RTRay(H, -L);
 
             float shadowFactor = AccumulateShadowFactor(lightRay, hitInfo.hitable, distance * distance);
 
-            result += intensityFactor * shadowFactor * PhongShadingColor(hitInfo.hitable.Kd, hitInfo.hitable.Ks, hitInfo.hitable.spec, N, L, E, NDotE) * light.color;
+            result += intensityFactor * shadowFactor * PhongShadingColor(hitInfo.hitable.Kd, hitInfo.hitable.Ks, hitInfo.hitable.spec, N, -lightRay.direction, E, NDotE) * light.color;
         }
 
         result += (mCamera.ambientLightColor * mCamera.ambientLightIntensity) * hitInfo.hitable.Ka;
@@ -361,7 +362,29 @@ public class RayTracer : MonoBehaviour {
     }
 
     private RTHitInfo GetClosetHitInfo(RTRay ray, HashSet<RTHitable> ignoreSet) {
-        throw new System.Exception("Not Implemented");
+        RTHitInfo hitInfo = null;
+        float hitPointDistanceSqr = float.MaxValue;
+
+        foreach (RTHitable hitable in hitables) {
+
+            if(ignoreSet != null && ignoreSet.Contains(hitable)) {
+                continue;
+            }
+
+            RTHitInfo localHitInfo = hitable.CheckCollision(ray);
+            if (localHitInfo != null) {
+                Vector3 hitVec = localHitInfo.hitPoint - ray.origin;
+                if (hitInfo == null) {
+                    hitInfo = localHitInfo;
+                    hitPointDistanceSqr = Vector3.Dot(hitVec, hitVec);
+                }
+                else if (Vector3.Dot(hitVec, hitVec) < hitPointDistanceSqr) {
+                    hitInfo = localHitInfo;
+                }
+            }
+        }
+
+        return hitInfo;
     }
 
     private RTHitInfo GetClosetHitInfo(RTRay ray) {

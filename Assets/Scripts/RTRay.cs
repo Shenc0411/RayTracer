@@ -10,7 +10,7 @@ public class RTRay {
     public readonly Vector3 direction;
 
     public RTRay(Vector3 origin, Vector3 direction) {
-        ++RAYS_SPAWNDED;
+        //++RAYS_SPAWNDED;
         this.origin = origin;
         this.direction = direction.normalized;
     }

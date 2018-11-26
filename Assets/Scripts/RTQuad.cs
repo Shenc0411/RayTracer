@@ -65,7 +65,6 @@ public class RTQuad : RTHitable {
         foreach(RTHitInfo hit in hitToRender) {
             Debug.DrawLine(hit.hitRay.origin, hit.hitPoint, Color.red);
             Debug.DrawRay(hit.hitPoint, hit.hitPointNormal, Color.blue);
-            Debug.DrawRay(hit.reflection.origin, hit.reflection.direction, Color.green);
         }
 
     }
@@ -100,25 +99,7 @@ public class RTQuad : RTHitable {
         if(u >= 0 && u <= ABLengthSquared && v >= 0 && v <= ACLengthSquared) {
             //Collision Detected
 
-            RTRay reflection = null;
-            RTRay refraction = null;
-
-            if (reflectionRate > 0) {
-                Vector3 NProjection = VDotN * N;
-                Vector3 reflectionDir = V - 2.0f * NProjection;
-                Vector3 reflectionHitPoint = I - planeNormal * RayTracer.HIT_POINT_OFFSET;
-                reflection = new RTRay(reflectionHitPoint, reflectionDir, null);
-            }
-
-            if (refractionRate > 0) {
-                Vector3 NProjection = VDotN * N;
-                Vector3 orthoNProjection = V - NProjection;
-                Vector3 refractionDir = NProjection + orthoNProjection * RayTracer.REFRACTION_FACTOR;
-                Vector3 refractionHitPoint = I + planeNormal * RayTracer.HIT_POINT_OFFSET;
-                refraction = new RTRay(refractionHitPoint, refractionDir, null);
-            }
-
-            RTHitInfo hitinfo = new RTHitInfo(this, I, N, ray, reflection, refraction);
+            RTHitInfo hitinfo = new RTHitInfo(this, I, N, ray);
 
             //if(reflectionRate > 0 && Random.Range(0, 1000) > 998) {
             //    hitToRender.Add(hitinfo);

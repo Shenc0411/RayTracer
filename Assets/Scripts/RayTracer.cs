@@ -23,16 +23,11 @@ public class RayTracer : MonoBehaviour {
     public List<RTHitable> hitables;
     public List<RTDirectionalLight> directionalLights;
     public List<RTPointLight> pointLights;
-    public HashSet<RTRay> activeRays;
     public RTRay[][] screenRays;
-    public GameObject rendererGO;
     public Vector3[][] screenPoints;
     public Color[][] screenPixels;
 
     public Texture2D renderTexture;
-
-    public static float HIT_POINT_OFFSET = 0.00001f;
-    public static float REFRACTION_FACTOR = 0.6f;
     
     public static Vector3[] superSampleKernalRegular = { new Vector3(-0.4f, 0.4f, 1.0f / 9.0f), new Vector3(0.0f, 0.4f, 1.0f / 9.0f), new Vector3(0.4f, 0.4f, 1.0f / 9.0f),
                                                     new Vector3(-0.4f, 0.0f, 1.0f / 9.0f), new Vector3(0.0f, 0.0f, 1.0f / 9.0f), new Vector3(0.4f, 0.0f, 1.0f / 9.0f),
@@ -43,6 +38,9 @@ public class RayTracer : MonoBehaviour {
 
     public static int superSampleKernalIndex = 0;
 
+    public float DIRECTIONAL_LIGHT_DISTANCE = 1000f;
+    public float HIT_POINT_OFFSET = 0.00001f;
+    public float REFRACTION_FACTOR = 0.6f;
     public float SHADOW_FACTOR = 0.1f;
     public float LIGHT_INTENSITY_FACTOR = 0.8f;
     public int MAX_RAY_DEPTH = 1;
@@ -55,10 +53,11 @@ public class RayTracer : MonoBehaviour {
         hitables = new List<RTHitable>();
         directionalLights = new List<RTDirectionalLight>();
         pointLights = new List<RTPointLight>();
-        activeRays = new HashSet<RTRay>();
-        
 
-        foreach(RTHitable hitable in sceneParentGO.GetComponentsInChildren<RTHitable>()) {
+        renderTexture = new Texture2D(mCamera.xResolution, mCamera.yResolution);
+
+
+        foreach (RTHitable hitable in sceneParentGO.GetComponentsInChildren<RTHitable>()) {
             hitables.Add(hitable);
         }
         foreach(RTDirectionalLight DL in sceneParentGO.GetComponentsInChildren<RTDirectionalLight>()) {
@@ -71,35 +70,34 @@ public class RayTracer : MonoBehaviour {
     }
 
     private void Start() {
-        RayTrace();
+        //RayTrace();
     }
 
     private void Update() {
 
-        RenderRays();
+        //RenderRays();
         RenderScreenPlane();
 
     }
 
     private void RenderScreenPlane() {
-        float realHalfX = rendererGO.transform.localScale.x / 2.0f;
-        float realHalfY = rendererGO.transform.localScale.y / 2.0f;
 
-        Matrix4x4 rot = Matrix4x4.Rotate(Quaternion.FromToRotation(new Vector3(0, 0, 1), mCamera.direction));
+        float realHalfY = 0.25f;
+        float realHalfX = realHalfY * mCamera.xResolution / mCamera.yResolution;
 
         int halfXRes = mCamera.xResolution / 2;
         int halfYRes = mCamera.yResolution / 2;
 
         Vector3[] screenVertices = new Vector3[4];
-        screenVertices[0] = mCamera.position + new Vector3(-realHalfX, realHalfY, mCamera.nearPlaneDistance);
-        screenVertices[1] = mCamera.position + new Vector3(realHalfX, realHalfY, mCamera.nearPlaneDistance);
-        screenVertices[2] = mCamera.position + new Vector3(realHalfX, -realHalfY, mCamera.nearPlaneDistance);
-        screenVertices[3] = mCamera.position + new Vector3(-realHalfX, -realHalfY, mCamera.nearPlaneDistance);
+        screenVertices[0] = new Vector3(-realHalfX, realHalfY, mCamera.nearPlaneDistance);
+        screenVertices[1] = new Vector3(realHalfX, realHalfY, mCamera.nearPlaneDistance);
+        screenVertices[2] = new Vector3(realHalfX, -realHalfY, mCamera.nearPlaneDistance);
+        screenVertices[3] = new Vector3(-realHalfX, -realHalfY, mCamera.nearPlaneDistance);
 
-        screenVertices[0] = rot * screenVertices[0];
-        screenVertices[1] = rot * screenVertices[1];
-        screenVertices[2] = rot * screenVertices[2];
-        screenVertices[3] = rot * screenVertices[3];
+        screenVertices[0] = mCamera.transform.TransformPoint(screenVertices[0]);
+        screenVertices[1] = mCamera.transform.TransformPoint(screenVertices[1]);
+        screenVertices[2] = mCamera.transform.TransformPoint(screenVertices[2]);
+        screenVertices[3] = mCamera.transform.TransformPoint(screenVertices[3]);
 
         Debug.DrawLine(screenVertices[0], screenVertices[1], Color.green);
         Debug.DrawLine(screenVertices[1], screenVertices[2], Color.green);
@@ -123,7 +121,6 @@ public class RayTracer : MonoBehaviour {
         }
         if (ray.hitInfo != null) {
             Debug.DrawLine(ray.origin, ray.hitInfo.hitPoint, Color.red);
-            RenderRay(ray.hitInfo.reflection);
             Debug.DrawRay(ray.hitInfo.hitPoint, ray.hitInfo.hitPointNormal, Color.blue);
         }
         else {
@@ -135,13 +132,8 @@ public class RayTracer : MonoBehaviour {
 
         screenPoints = new Vector3[mCamera.yResolution][];
 
-        rendererGO.transform.forward = mCamera.direction;
-        rendererGO.transform.position = mCamera.position + mCamera.nearPlaneDistance * mCamera.transform.forward;
-
-        float realHalfX = rendererGO.transform.localScale.x / 2.0f;
-        float realHalfY = rendererGO.transform.localScale.y / 2.0f;
-
-        Matrix4x4 rot = Matrix4x4.Rotate(Quaternion.FromToRotation(new Vector3(0, 0, 1), mCamera.direction));
+        float realHalfY = 0.25f;
+        float realHalfX = realHalfY * mCamera.xResolution / mCamera.yResolution;
 
         int halfXRes = mCamera.xResolution / 2;
         int halfYRes = mCamera.yResolution / 2;
@@ -152,8 +144,8 @@ public class RayTracer : MonoBehaviour {
         for (int y = 0; y < mCamera.yResolution; ++y) {
             screenPoints[y] = new Vector3[mCamera.xResolution];
             for (int x = 0; x < mCamera.xResolution; ++x) {
-                screenPoints[y][x] = mCamera.position + new Vector3(-realHalfX + x * xScale, realHalfY - y * yScale, mCamera.nearPlaneDistance);
-                screenPoints[y][x] = rot * screenPoints[y][x];
+                screenPoints[y][x] = new Vector3(-realHalfX + x * xScale, realHalfY - y * yScale, mCamera.nearPlaneDistance);
+                screenPoints[y][x] = mCamera.transform.TransformPoint(screenPoints[y][x]);
             }
         }
 
@@ -172,13 +164,10 @@ public class RayTracer : MonoBehaviour {
 
         GenerateScreenPoints();
 
-        renderTexture = new Texture2D(mCamera.xResolution, mCamera.yResolution);
-
         screenRays = new RTRay[mCamera.yResolution][];
         screenPixels = new Color[mCamera.yResolution][];
         List<Thread> TCThreads = new List<Thread>();
 
-        List<object> TCParameters = new List<object>();
         List<TraceColorJob> jobs = new List<TraceColorJob>();
 
         int TCBatchNum = CPU_NUM;
@@ -194,7 +183,7 @@ public class RayTracer : MonoBehaviour {
                 if (multiThreadMode) {
                     if (jobs.Count >= TCBatchSize) {
                         Thread thread = new Thread(new ParameterizedThreadStart(TraceColorThread));
-                        TCParameters.Add(jobs);
+                        thread.Start(jobs);
                         TCThreads.Add(thread);
                         jobs = new List<TraceColorJob>();
 
@@ -219,10 +208,8 @@ public class RayTracer : MonoBehaviour {
 
                     //pixel = TraceColor(screenRays[y][x], 1);
 
-                    renderTexture.SetPixel(x, mCamera.yResolution - y, pixel);
+                    renderTexture.SetPixel(x, mCamera.yResolution - y - 1, pixel);
                 }
-
-
 
             }
         }
@@ -230,12 +217,8 @@ public class RayTracer : MonoBehaviour {
 
         if (multiThreadMode) {
             Thread threadl = new Thread(new ParameterizedThreadStart(TraceColorThread));
-            TCParameters.Add(jobs);
+            threadl.Start(jobs);
             TCThreads.Add(threadl);
-
-            for(int i = 0; i < TCThreads.Count; ++i) {
-                TCThreads[i].Start(TCParameters[i]);
-            }
 
             foreach (Thread thread in TCThreads) {
                 thread.Join();
@@ -243,7 +226,7 @@ public class RayTracer : MonoBehaviour {
 
             for (int y = 0; y < mCamera.yResolution; ++y) {
                 for (int x = 0; x < mCamera.xResolution; ++x) {
-                    renderTexture.SetPixel(x, mCamera.yResolution - y, screenPixels[y][x]);
+                    renderTexture.SetPixel(x, mCamera.yResolution - y - 1, screenPixels[y][x]);
                 }
             }
         }
@@ -282,12 +265,28 @@ public class RayTracer : MonoBehaviour {
 
             ray.hitInfo = hitInfo;
 
-            Color lightColor = TraceLightColor(hitInfo);
-            Color reflectionColor = hitInfo.hitable.reflectionRate * TraceColor(hitInfo.reflection, depth + 1);
-            Color refractionColor = hitInfo.hitable.refractionRate * TraceColor(hitInfo.refraction, depth + 1);
+            result = Mathf.Clamp01(1 - hitInfo.hitable.reflectionRate - hitInfo.hitable.refractionRate) * TraceLightColor(hitInfo);
 
-            float phongCoefficient = Mathf.Clamp01(1 - hitInfo.hitable.reflectionRate - hitInfo.hitable.refractionRate);
-            result = phongCoefficient * lightColor + reflectionColor + refractionColor;
+            if (hitInfo.hitable.reflectionRate > 0 && hitInfo.hitable.refractionRate > 0) {
+
+                Vector3 normalProjVec = hitInfo.hitPointNormal * Vector3.Dot(ray.direction, hitInfo.hitPointNormal);
+
+                result += hitInfo.hitable.reflectionRate * TraceColor(new RTRay(hitInfo.hitPoint + hitInfo.hitPointNormal * HIT_POINT_OFFSET, ray.direction - 2.0f * normalProjVec, null), depth + 1);
+
+                result += hitInfo.hitable.refractionRate * TraceColor(new RTRay(hitInfo.hitPoint - hitInfo.hitPointNormal * HIT_POINT_OFFSET, normalProjVec + (ray.direction - normalProjVec) * REFRACTION_FACTOR, null), depth + 1);
+
+            }
+            else if (hitInfo.hitable.reflectionRate > 0) {
+                Vector3 normalProjVec = hitInfo.hitPointNormal * Vector3.Dot(ray.direction, hitInfo.hitPointNormal);
+
+                result += hitInfo.hitable.reflectionRate * TraceColor(new RTRay(hitInfo.hitPoint + hitInfo.hitPointNormal * HIT_POINT_OFFSET, ray.direction - 2.0f * normalProjVec, null), depth + 1);
+            }
+            else if (hitInfo.hitable.refractionRate > 0) {
+
+                Vector3 normalProjVec = hitInfo.hitPointNormal * Vector3.Dot(ray.direction, hitInfo.hitPointNormal);
+
+                result += hitInfo.hitable.refractionRate * TraceColor(new RTRay(hitInfo.hitPoint - hitInfo.hitPointNormal * HIT_POINT_OFFSET, normalProjVec + (ray.direction - normalProjVec) * REFRACTION_FACTOR, null), depth + 1);
+            }
         }
         
         return result;
@@ -303,34 +302,17 @@ public class RayTracer : MonoBehaviour {
 
         float NDotE = Vector3.Dot(N, -E);
 
-        Color Kd = hitInfo.hitable.Kd;
-        Color Ks = hitInfo.hitable.Ks;
-        Color Ka = hitInfo.hitable.Ka;
-
-        float spec = hitInfo.hitable.spec;
-
         foreach (RTDirectionalLight light in directionalLights) {
 
             Vector3 L = light.direction;
 
             float intensityFactor = light.intensity;
 
-            RTRay lightTraceRay = new RTRay(hitInfo.hitPoint, -L, null);
+            RTRay lightRay = new RTRay(H, -L, null);
 
-            float shadowFactor = 1.0f;
+            float shadowFactor = AccumulateShadowFactor(lightRay, hitInfo.hitable, DIRECTIONAL_LIGHT_DISTANCE * DIRECTIONAL_LIGHT_DISTANCE);
 
-            foreach (RTHitable hitable in hitables) {
-                if (hitable == hitInfo.hitable) {
-                    continue;
-                }
-                RTHitInfo hit = hitable.CheckCollision(lightTraceRay);
-                if (hit != null) {
-                    shadowFactor = SHADOW_FACTOR;
-                    break;
-                }
-            }
-
-            result += intensityFactor * shadowFactor * PhongShadingColor(Ka, Kd, Ks, spec, N, L, E, NDotE) * light.color;
+            result += intensityFactor * shadowFactor * PhongShadingColor(hitInfo.hitable.Kd, hitInfo.hitable.Ks, hitInfo.hitable.spec, N, L, E, NDotE) * light.color;
         }
 
         foreach (RTPointLight light in pointLights) {
@@ -349,21 +331,17 @@ public class RayTracer : MonoBehaviour {
 
             RTRay lightRay = new RTRay(hitInfo.hitPoint, -L, null);
 
-            float shadowFactor = AccumulateShadowFactor(lightRay, hitInfo.hitable, distance, light.position);
+            float shadowFactor = AccumulateShadowFactor(lightRay, hitInfo.hitable, distance * distance);
 
-            result += intensityFactor * shadowFactor * PhongShadingColor(Ka, Kd, Ks, spec, N, L, E, NDotE) * light.color;
+            result += intensityFactor * shadowFactor * PhongShadingColor(hitInfo.hitable.Kd, hitInfo.hitable.Ks, hitInfo.hitable.spec, N, L, E, NDotE) * light.color;
         }
 
-        result += (mCamera.ambientLightColor * mCamera.ambientLightIntensity) * Ka;
+        result += (mCamera.ambientLightColor * mCamera.ambientLightIntensity) * hitInfo.hitable.Ka;
 
         return LIGHT_INTENSITY_FACTOR * result;
     }
 
-    private Color PhongShadingColor(Color Ka, Color Kd, Color Ks, float spec, Vector3 N, Vector3 L, Vector3 E, float NDotE) {
-
-        Color result = Color.black;
-
-        Color local = Color.black;
+    private Color PhongShadingColor(Color Kd, Color Ks, float spec, Vector3 N, Vector3 L, Vector3 E, float NDotE) {
 
         float NDotL = Vector3.Dot(N, -L);
 
@@ -376,7 +354,7 @@ public class RayTracer : MonoBehaviour {
             NDotE = -NDotE;
         }
         else {
-            return result;
+            return Color.black;
         }
 
         Vector3 R = L + 2.0f * NDotL * N;
@@ -387,39 +365,33 @@ public class RayTracer : MonoBehaviour {
         return NDotL * Kd + powedRDotE * Ks;
     }
 
-    private RTHitInfo GetClosetHitInfo(RTRay ray) {
-        return GetClosetHitInfo(ray, null);
+    private RTHitInfo GetClosetHitInfo(RTRay ray, HashSet<RTHitable> ignoreSet) {
+        throw new System.Exception("Not Implemented");
     }
 
-    private RTHitInfo GetClosetHitInfo(RTRay ray, HashSet<RTHitable> ignoreSet) {
+    private RTHitInfo GetClosetHitInfo(RTRay ray) {
 
         RTHitInfo hitInfo = null;
-        float hitPointDistance = float.MaxValue;
+        float hitPointDistanceSqr = float.MaxValue;
 
         foreach (RTHitable hitable in hitables) {
-            if (ignoreSet != null && ignoreSet.Contains(hitable)) {
-                continue;
-            }
             RTHitInfo localHitInfo = hitable.CheckCollision(ray);
             if (localHitInfo != null) {
-                float localHitPointDistance = (localHitInfo.hitPoint - ray.origin).magnitude;
+                Vector3 hitVec = localHitInfo.hitPoint - ray.origin;
                 if (hitInfo == null) {
                     hitInfo = localHitInfo;
-                    hitPointDistance = localHitPointDistance;
+                    hitPointDistanceSqr = Vector3.Dot(hitVec, hitVec);
                 }
-                else {
-                    if (localHitPointDistance < hitPointDistance) {
-                        hitInfo = localHitInfo;
-                    }
+                else if (Vector3.Dot(hitVec, hitVec) < hitPointDistanceSqr) {
+                    hitInfo = localHitInfo;
                 }
             }
         }
 
         return hitInfo;
-
     }
 
-    private float AccumulateShadowFactor(RTRay lightTraceRay, RTHitable self, float LHDist, Vector3 lightPosition) {
+    private float AccumulateShadowFactor(RTRay lightTraceRay, RTHitable self, float LHDistSqr) {
 
         if (!renderShadows) {
             return 1.0f;
@@ -431,13 +403,14 @@ public class RayTracer : MonoBehaviour {
             if (hitable == self) {
                 continue;
             }
+            
             RTHitInfo localHitInfo = hitable.CheckCollision(lightTraceRay);
+
             if (localHitInfo != null) {
 
-                Vector3 localH = localHitInfo.hitPoint;
-                Vector3 localLH = localH - lightPosition;
+                Vector3 localLH = localHitInfo.hitPoint - lightTraceRay.origin;
 
-                if(Vector3.Dot(localLH, -lightTraceRay.direction) > 0 && localLH.magnitude < LHDist) {
+                if(Vector3.Dot(localLH, localLH) < LHDistSqr) {
                     shadowFactor *= Mathf.Clamp01(localHitInfo.hitable.refractionRate + SHADOW_FACTOR);
                 }
 

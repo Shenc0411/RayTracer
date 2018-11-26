@@ -8,13 +8,11 @@ public class RTRay {
 
     public readonly Vector3 origin;
     public readonly Vector3 direction;
-    public RTHitInfo hitInfo;
 
-    public RTRay(Vector3 origin, Vector3 direction, RTHitInfo hitInfo) {
+    public RTRay(Vector3 origin, Vector3 direction) {
         ++RAYS_SPAWNDED;
         this.origin = origin;
         this.direction = direction.normalized;
-        this.hitInfo = hitInfo;
     }
 
 }

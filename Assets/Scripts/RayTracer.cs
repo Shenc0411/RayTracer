@@ -28,15 +28,15 @@ public class RayTracer : MonoBehaviour {
     public Color[][] screenPixels;
 
     public Texture2D renderTexture;
-    
-    public static Vector3[] superSampleKernalRegular = { new Vector3(-0.4f, 0.4f, 1.0f / 9.0f), new Vector3(0.0f, 0.4f, 1.0f / 9.0f), new Vector3(0.4f, 0.4f, 1.0f / 9.0f),
-                                                    new Vector3(-0.4f, 0.0f, 1.0f / 9.0f), new Vector3(0.0f, 0.0f, 1.0f / 9.0f), new Vector3(0.4f, 0.0f, 1.0f / 9.0f),
-                                                    new Vector3(-0.4f, -0.4f, 1.0f / 9.0f), new Vector3(0.0f, -0.4f, 1.0f / 9.0f), new Vector3(0.4f, -0.4f, 1.0f / 9.0f)};
+
+    public static Vector3[] superSampleKernal = { new Vector3(-0.52f, 0.38f, 0.128f), new Vector3(0.41f, 0.56f, 0.119f), new Vector3(0.27f, 0.08f, 0.294f),
+                                                    new Vector3(-0.17f, -0.29f, 0.249f), new Vector3(0.58f, -0.55f, 0.104f), new Vector3(-0.31f, -0.71f, 0.106f)};
+
     public static Vector3[] nonSuperSampleKernal = { new Vector3(0f, 0f, 1f)};
 
-    public static Vector3[][] superSampleKernals = { nonSuperSampleKernal, superSampleKernalRegular };
+    public static Vector3[][] superSampleKernals = { nonSuperSampleKernal, superSampleKernal };
 
-    public static int superSampleKernalIndex = 0;
+    public int superSampleKernalIndex = 0;
 
     public float DIRECTIONAL_LIGHT_DISTANCE = 1000f;
     public float HIT_POINT_OFFSET = 0.00001f;
@@ -47,6 +47,8 @@ public class RayTracer : MonoBehaviour {
     public bool multiThreadMode = true;
     public bool renderShadows = true;
     public int CPU_NUM = 12;
+
+    public float xScale, yScale;
 
     private void Awake() {
 
@@ -120,13 +122,9 @@ public class RayTracer : MonoBehaviour {
         if(ray == null) {
             return;
         }
-        if (ray.hitInfo != null) {
-            Debug.DrawLine(ray.origin, ray.hitInfo.hitPoint, Color.red);
-            Debug.DrawRay(ray.hitInfo.hitPoint, ray.hitInfo.hitPointNormal, Color.blue);
-        }
-        else {
-            Debug.DrawRay(ray.origin, ray.direction, Color.red);
-        }
+        
+        Debug.DrawRay(ray.origin, ray.direction, Color.red);
+
     }
 
     private void GenerateScreenPoints() {
@@ -139,8 +137,8 @@ public class RayTracer : MonoBehaviour {
         int halfXRes = mCamera.xResolution / 2;
         int halfYRes = mCamera.yResolution / 2;
 
-        float xScale = realHalfX / halfXRes;
-        float yScale = realHalfY / halfYRes;
+        xScale = realHalfX / halfXRes;
+        yScale = realHalfY / halfYRes;
 
         for (int y = 0; y < mCamera.yResolution; ++y) {
             screenPoints[y] = new Vector3[mCamera.xResolution];
@@ -153,7 +151,7 @@ public class RayTracer : MonoBehaviour {
     }
 
     private RTRay GetScreenRay(int x, int y) {
-        return new RTRay(mCamera.position, screenPoints[y][x] - mCamera.position, null);
+        return new RTRay(mCamera.position, screenPoints[y][x] - mCamera.position);
     }
 
     public void RayTrace() {
@@ -172,7 +170,7 @@ public class RayTracer : MonoBehaviour {
         List<TraceColorJob> jobs = new List<TraceColorJob>();
 
         int TCBatchNum = CPU_NUM;
-        int TCBatchSize = mCamera.yResolution * mCamera.xResolution / TCBatchNum;
+        int TCBatchSize = mCamera.yResolution * mCamera.xResolution * superSampleKernals[superSampleKernalIndex].Length / TCBatchNum;
 
         for (int y = 0; y < mCamera.yResolution; ++y) {
             screenRays[y] = new RTRay[mCamera.xResolution];
@@ -182,29 +180,31 @@ public class RayTracer : MonoBehaviour {
                 screenPixels[y][x] = Color.black;
 
                 if (multiThreadMode) {
-                    if (jobs.Count >= TCBatchSize) {
-                        Thread thread = new Thread(new ParameterizedThreadStart(TraceColorThread));
-                        thread.Start(jobs);
-                        TCThreads.Add(thread);
-                        jobs = new List<TraceColorJob>();
+                    
+                    foreach (Vector3 offset in superSampleKernals[superSampleKernalIndex]) {
 
+                        if (jobs.Count >= TCBatchSize) {
+                            Thread thread = new Thread(new ParameterizedThreadStart(TraceColorThread));
+                            thread.Start(jobs);
+                            TCThreads.Add(thread);
+                            jobs = new List<TraceColorJob>();
+                        }
+
+                        Vector3 pos = screenPoints[y][x];
+                        pos.x += offset.x * xScale;
+                        pos.y += offset.y * yScale;
+                        jobs.Add(new TraceColorJob(x, y, offset.z, new RTRay(mCamera.position, pos - mCamera.position)));
                     }
-
-                    jobs.Add(new TraceColorJob(x, y, 1.0f, screenRays[y][x]));
+                    
                 }
                 else {
                     Color pixel = Color.black;
 
                     foreach (Vector3 offset in superSampleKernals[superSampleKernalIndex]) {
                         Vector3 pos = screenPoints[y][x];
-
-                        pos.x += offset.x;
-                        pos.y += offset.y;
-
-                        RTRay ray = new RTRay(mCamera.position, pos - mCamera.position, null);
-
-                        pixel += offset.z * TraceColor(screenRays[y][x], 1);
-
+                        pos.x += offset.x * xScale;
+                        pos.y += offset.y * yScale;
+                        pixel += offset.z * TraceColor(new RTRay(mCamera.position, pos - mCamera.position), 1);
                     }
 
                     renderTexture.SetPixel(x, mCamera.yResolution - y - 1, pixel);
@@ -212,7 +212,6 @@ public class RayTracer : MonoBehaviour {
 
             }
         }
-
 
         if (multiThreadMode) {
             Thread threadl = new Thread(new ParameterizedThreadStart(TraceColorThread));
@@ -246,7 +245,7 @@ public class RayTracer : MonoBehaviour {
     private void TraceColorThread(object parameter) {
         List<TraceColorJob> jobList = (List<TraceColorJob>)parameter;
         foreach(TraceColorJob job in jobList) {
-            screenPixels[job.y][job.x] = job.weight * TraceColor(job.ray, 1);
+            screenPixels[job.y][job.x] += job.weight * TraceColor(job.ray, 1);
         }
     }
 
@@ -262,7 +261,6 @@ public class RayTracer : MonoBehaviour {
 
         if (hitInfo != null) {
 
-            ray.hitInfo = hitInfo;
 
             result = Mathf.Clamp01(1 - hitInfo.hitable.reflectionRate - hitInfo.hitable.refractionRate) * TraceLightColor(hitInfo);
 
@@ -270,21 +268,21 @@ public class RayTracer : MonoBehaviour {
 
                 Vector3 normalProjVec = hitInfo.hitPointNormal * Vector3.Dot(ray.direction, hitInfo.hitPointNormal);
 
-                result += hitInfo.hitable.reflectionRate * TraceColor(new RTRay(hitInfo.hitPoint + hitInfo.hitPointNormal * HIT_POINT_OFFSET, ray.direction - 2.0f * normalProjVec, null), depth + 1);
+                result += hitInfo.hitable.reflectionRate * TraceColor(new RTRay(hitInfo.hitPoint + hitInfo.hitPointNormal * HIT_POINT_OFFSET, ray.direction - 2.0f * normalProjVec), depth + 1);
 
-                result += hitInfo.hitable.refractionRate * TraceColor(new RTRay(hitInfo.hitPoint - hitInfo.hitPointNormal * HIT_POINT_OFFSET, normalProjVec + (ray.direction - normalProjVec) * REFRACTION_FACTOR, null), depth + 1);
+                result += hitInfo.hitable.refractionRate * TraceColor(new RTRay(hitInfo.hitPoint - hitInfo.hitPointNormal * HIT_POINT_OFFSET, normalProjVec + (ray.direction - normalProjVec) * REFRACTION_FACTOR), depth + 1);
 
             }
             else if (hitInfo.hitable.reflectionRate > 0) {
                 Vector3 normalProjVec = hitInfo.hitPointNormal * Vector3.Dot(ray.direction, hitInfo.hitPointNormal);
 
-                result += hitInfo.hitable.reflectionRate * TraceColor(new RTRay(hitInfo.hitPoint + hitInfo.hitPointNormal * HIT_POINT_OFFSET, ray.direction - 2.0f * normalProjVec, null), depth + 1);
+                result += hitInfo.hitable.reflectionRate * TraceColor(new RTRay(hitInfo.hitPoint + hitInfo.hitPointNormal * HIT_POINT_OFFSET, ray.direction - 2.0f * normalProjVec), depth + 1);
             }
             else if (hitInfo.hitable.refractionRate > 0) {
 
                 Vector3 normalProjVec = hitInfo.hitPointNormal * Vector3.Dot(ray.direction, hitInfo.hitPointNormal);
 
-                result += hitInfo.hitable.refractionRate * TraceColor(new RTRay(hitInfo.hitPoint - hitInfo.hitPointNormal * HIT_POINT_OFFSET, normalProjVec + (ray.direction - normalProjVec) * REFRACTION_FACTOR, null), depth + 1);
+                result += hitInfo.hitable.refractionRate * TraceColor(new RTRay(hitInfo.hitPoint - hitInfo.hitPointNormal * HIT_POINT_OFFSET, normalProjVec + (ray.direction - normalProjVec) * REFRACTION_FACTOR), depth + 1);
             }
         }
         
@@ -303,15 +301,13 @@ public class RayTracer : MonoBehaviour {
 
         foreach (RTDirectionalLight light in directionalLights) {
 
-            Vector3 L = light.direction;
-
             float intensityFactor = light.intensity;
 
-            RTRay lightRay = new RTRay(H, -L, null);
+            RTRay lightRay = new RTRay(H, -light.direction);
 
             float shadowFactor = AccumulateShadowFactor(lightRay, hitInfo.hitable, DIRECTIONAL_LIGHT_DISTANCE * DIRECTIONAL_LIGHT_DISTANCE);
 
-            result += intensityFactor * shadowFactor * PhongShadingColor(hitInfo.hitable.Kd, hitInfo.hitable.Ks, hitInfo.hitable.spec, N, L, E, NDotE) * light.color;
+            result += intensityFactor * shadowFactor * PhongShadingColor(hitInfo.hitable.Kd, hitInfo.hitable.Ks, hitInfo.hitable.spec, N, light.direction, E, NDotE) * light.color;
         }
 
         foreach (RTPointLight light in pointLights) {
@@ -328,7 +324,7 @@ public class RayTracer : MonoBehaviour {
 
             float intensityFactor = light.intensity * (1.0f - distance / light.range);
 
-            RTRay lightRay = new RTRay(hitInfo.hitPoint, -L, null);
+            RTRay lightRay = new RTRay(H, -L);
 
             float shadowFactor = AccumulateShadowFactor(lightRay, hitInfo.hitable, distance * distance);
 

@@ -16,15 +16,6 @@ public class TraceColorJob {
     }
 }
 
-public class TraceColorThreadParameter {
-
-    public List<TraceColorJob> traceColorJobs;
-
-    public TraceColorThreadParameter(List<TraceColorJob> traceColorJobs) {
-        this.traceColorJobs = traceColorJobs;
-    }
-}
-
 public class RayTracer : MonoBehaviour {
 
     public RTCamera mCamera;
@@ -40,9 +31,9 @@ public class RayTracer : MonoBehaviour {
 
     public Texture2D renderTexture;
 
-    public static float REFRACTION_DISTANCE = 0.00001f;
+    public static float HIT_POINT_OFFSET = 0.00001f;
     public static float REFRACTION_FACTOR = 0.6f;
-    public static int MAX_RAY_DEPTH = 3;
+    public static int MAX_RAY_DEPTH = 4;
     public static float SHADOW_FACTOR = 0.1f;
 
     public static float LIGHT_INTENSITY_FACTOR = 0.8f;
@@ -121,7 +112,7 @@ public class RayTracer : MonoBehaviour {
         for (int y = 0; y < mCamera.yResolution; ++y) {
             for (int x = 0; x < mCamera.xResolution; ++x) {
                 if (screenRays != null && screenRays[y] != null) {
-                    if(x != 768 || y != 490) {
+                    if(x % 256 != 0|| y % 256 != 0) {
                         continue;
                     }
                     RenderRay(screenRays[y][x]);
@@ -189,61 +180,64 @@ public class RayTracer : MonoBehaviour {
         renderTexture = new Texture2D(mCamera.xResolution, mCamera.yResolution);
 
         screenRays = new RTRay[mCamera.yResolution][];
-
+        screenPixels = new Color[mCamera.yResolution][];
         List<Thread> TCThreads = new List<Thread>();
 
         List<TraceColorJob> jobs = new List<TraceColorJob>();
 
         int TCBatchNum = CPU_NUM;
         int TCBatchSize = mCamera.yResolution * mCamera.xResolution / TCBatchNum;
-        int TCBatchIndex = 0;
-        int TCBatchCurrent = 0;
-        int TCBatchEnd = TCBatchSize;
+
 
         for (int y = 0; y < mCamera.yResolution; ++y) {
             screenRays[y] = new RTRay[mCamera.xResolution];
+            screenPixels[y] = new Color[mCamera.xResolution];
             for (int x = 0; x < mCamera.xResolution; ++x) {
                 screenRays[y][x] = GetScreenRay(x, y);
 
-                //if(TCBatchCurrent == TCBatchEnd) {
+                if (jobs.Count >= TCBatchSize) {
 
-                //    Thread thread = new Thread(new ParameterizedThreadStart(TraceColorThread));
-                //    thread.Start(jobs);
-                //    TCThreads.Add(thread);
+                    Thread thread = new Thread(new ParameterizedThreadStart(TraceColorThread));
+                    thread.Start(jobs);
+                    TCThreads.Add(thread);
 
-                //    TCBatchCurrent = 0;
-                //    TCBatchIndex++;
-                //    TCBatchEnd = Mathf.Min(TCBatchEnd + TCBatchSize, mCamera.yResolution * mCamera.xResolution);
-                //    jobs = new List<TraceColorJob>();
-                //}
-
-                //jobs.Add(new TraceColorJob(x, y, 1.0f, screenRays[y][x]));
-
-                Color pixel = Color.black;
-                foreach (Vector3 offset in superSampleKernals[superSampleKernalIndex]) {
-                    Vector3 pos = screenPoints[y][x];
-
-                    pos.x += offset.x;
-                    pos.y += offset.y;
-
-                    RTRay ray = new RTRay(mCamera.position, pos - mCamera.position, null);
-
-                    pixel += offset.z * TraceColor(screenRays[y][x], 1);
-
+                    jobs = new List<TraceColorJob>();
+                  
                 }
-                renderTexture.SetPixel(x, mCamera.yResolution - y, pixel);
+
+                jobs.Add(new TraceColorJob(x, y, 1.0f, screenRays[y][x]));
+
+                //Color pixel = Color.black;
+                ////foreach (Vector3 offset in superSampleKernals[superSampleKernalIndex]) {
+                ////    Vector3 pos = screenPoints[y][x];
+
+                ////    pos.x += offset.x;
+                ////    pos.y += offset.y;
+
+                ////    RTRay ray = new RTRay(mCamera.position, pos - mCamera.position, null);
+
+                ////    pixel += offset.z * TraceColor(screenRays[y][x], 1);
+
+                ////}
+                //pixel = TraceColor(screenRays[y][x], 1);
+
+                //renderTexture.SetPixel(x, mCamera.yResolution - y, pixel);
             }
         }
 
-        //foreach(Thread thread in TCThreads) {
-        //    thread.Join();
-        //}
+        Thread threadl = new Thread(new ParameterizedThreadStart(TraceColorThread));
+        threadl.Start(jobs);
+        TCThreads.Add(threadl);
 
-        //for (int y = 0; y < mCamera.yResolution; ++y) {
-        //    for (int x = 0; x < mCamera.xResolution; ++x) {
-        //        renderTexture.SetPixel(x, mCamera.yResolution - y, screenPixels[y][x]);
-        //    }
-        //}
+        foreach (Thread thread in TCThreads) {
+            thread.Join();
+        }
+
+        for (int y = 0; y < mCamera.yResolution; ++y) {
+            for (int x = 0; x < mCamera.xResolution; ++x) {
+                renderTexture.SetPixel(x, mCamera.yResolution - y, screenPixels[y][x]);
+            }
+        }
 
         renderTexture.Apply();
 
@@ -258,9 +252,9 @@ public class RayTracer : MonoBehaviour {
     }
 
     private void TraceColorThread(object parameter) {
-        TraceColorThreadParameter realParameter = (TraceColorThreadParameter)parameter;
-        foreach(TraceColorJob TCJ in realParameter.traceColorJobs) {
-            screenPixels[TCJ.y][TCJ.x] = TCJ.weight * TraceColor(TCJ.ray, 1);
+        List<TraceColorJob> jobList = (List<TraceColorJob>)parameter;
+        foreach(TraceColorJob job in jobList) {
+            screenPixels[job.y][job.x] += job.weight * TraceColor(job.ray, 1);
         }
     }
 
@@ -299,8 +293,6 @@ public class RayTracer : MonoBehaviour {
 
         Color ambientTerm = Color.black; 
         
-        hitInfo.hitPointNormal.Normalize();
-        hitInfo.hitRay.direction.Normalize();
         Vector3 N = hitInfo.hitPointNormal;
         Vector3 E = hitInfo.hitRay.direction;
         Vector3 H = hitInfo.hitPoint;
@@ -399,8 +391,6 @@ public class RayTracer : MonoBehaviour {
 
     private RTHitInfo GetClosetHitInfo(RTRay ray, HashSet<RTHitable> ignoreSet) {
 
-        ray.direction.Normalize();
-
         RTHitInfo hitInfo = null;
         float hitPointDistance = float.MaxValue;
 
@@ -430,8 +420,6 @@ public class RayTracer : MonoBehaviour {
     private float AccumulateShadowFactor(RTRay lightTraceRay, RTHitable self, float LHDist, Vector3 lightPosition) {
 
         float shadowFactor = 1f;
-
-        lightTraceRay.direction.Normalize();
 
         foreach (RTHitable hitable in hitables) {
             if (hitable == self) {

@@ -11,7 +11,7 @@ public class RTRay {
     public RTRay(Vector3 origin, Vector3 direction, RTHitInfo hitInfo) {
         ++RayTracer.RAYS_SPAWNDED;
         this.origin = origin;
-        this.direction = direction;
+        this.direction = direction.normalized;
         this.hitInfo = hitInfo;
     }
 

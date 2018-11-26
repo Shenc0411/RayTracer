@@ -24,8 +24,8 @@ public class RTSphere : RTHitable {
             Vector3 Q = ray.origin + (OPDist + PQDist) * ray.direction; //Actual Hitpoint
             Vector3 normal = (position - Q).normalized;
 
-            Vector3 refractionHitPoint = Q - normal * RayTracer.REFRACTION_DISTANCE;
-            Vector3 hitPoint = Q + normal * RayTracer.REFRACTION_DISTANCE;
+            Vector3 refractionHitPoint = Q - normal * RayTracer.HIT_POINT_OFFSET;
+            Vector3 hitPoint = Q + normal * RayTracer.HIT_POINT_OFFSET;
 
             RTRay reflection = null;
             RTRay refraction = null;
@@ -66,8 +66,8 @@ public class RTSphere : RTHitable {
                 }
                 Vector3 Q = ray.origin + (OPDist - QPDist) * ray.direction; //actual hitpoint
                 Vector3 normal = (Q - position).normalized;
-                Vector3 refractionHitPoint = Q - normal * RayTracer.REFRACTION_DISTANCE;
-                Vector3 hitPoint = Q + normal * RayTracer.REFRACTION_DISTANCE;
+                Vector3 refractionHitPoint = Q - normal * RayTracer.HIT_POINT_OFFSET;
+                Vector3 hitPoint = Q + normal * RayTracer.HIT_POINT_OFFSET;
 
                 RTRay reflection = null;
                 RTRay refraction = null;

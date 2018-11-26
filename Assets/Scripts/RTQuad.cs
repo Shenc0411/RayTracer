@@ -57,10 +57,16 @@ public class RTQuad : RTHitable {
         //B = transform.localToWorldMatrix * B;
         //C = transform.localToWorldMatrix * C;
 
-        Debug.DrawLine(A, B, Color.green);
-        Debug.DrawLine(B, C, Color.green);
-        Debug.DrawLine(C, A, Color.green);
-        Debug.DrawRay(position, planeNormal, Color.blue);
+        //Debug.DrawLine(A, B, Color.green);
+        //Debug.DrawLine(B, C, Color.green);
+        //Debug.DrawLine(C, A, Color.green);
+        //Debug.DrawRay(position, planeNormal, Color.blue);
+
+        foreach(RTHitInfo hit in hitToRender) {
+            Debug.DrawLine(hit.hitRay.origin, hit.hitPoint, Color.red);
+            Debug.DrawRay(hit.hitPoint, hit.hitPointNormal, Color.blue);
+            Debug.DrawRay(hit.reflection.origin, hit.reflection.direction, Color.green);
+        }
 
     }
 
@@ -84,7 +90,7 @@ public class RTQuad : RTHitable {
             return null;
         }
 
-        Vector3 I = ray.origin + V * t;
+        Vector3 I = ray.origin + V * t; // Actual Hitpoint
 
         Vector3 IA = I - A;
 
@@ -94,15 +100,31 @@ public class RTQuad : RTHitable {
         if(u >= 0 && u <= ABLengthSquared && v >= 0 && v <= ACLengthSquared) {
             //Collision Detected
 
-            Vector3 reflectionDir = V - 2.0f * VDotN * N;
+            Vector3 NProjection = VDotN * N;
+            Vector3 orthoNProjection = V - NProjection;
+
             RTRay reflection = null;
             RTRay refraction = null;
 
-            if(reflectionRate > 0) {
-                reflection = new RTRay(I, reflectionDir, null);
+            Vector3 reflectionDir = V - 2.0f * NProjection;
+            Vector3 reflectionHitPoint = I - planeNormal * RayTracer.HIT_POINT_OFFSET;
+
+            Vector3 refractionDir = NProjection + orthoNProjection * RayTracer.REFRACTION_FACTOR;
+            Vector3 refractionHitPoint = I + planeNormal * RayTracer.HIT_POINT_OFFSET;
+
+            if (reflectionRate > 0) {
+                reflection = new RTRay(reflectionHitPoint, reflectionDir, null);
             }
 
-            RTHitInfo hitinfo = new RTHitInfo(this, I, I,  N, ray, reflection, refraction);
+            if (refractionRate > 0) {
+                reflection = new RTRay(refractionHitPoint, refractionDir, null);
+            }
+
+            RTHitInfo hitinfo = new RTHitInfo(this, reflectionHitPoint, refractionHitPoint, N, ray, reflection, refraction);
+
+            //if(reflectionRate > 0 && Random.Range(0, 1000) > 998) {
+            //    hitToRender.Add(hitinfo);
+            //}
 
             return hitinfo;
 

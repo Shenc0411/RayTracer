@@ -44,7 +44,7 @@ public class RTSphere : RTHitable {
                 refraction = new RTRay(refractionHitPoint, refractionDir, null);
             }
             
-            return new RTHitInfo(this, hitPoint, refractionHitPoint, normal, ray, reflection, refraction);
+            return new RTHitInfo(this, Q, normal, ray, reflection, refraction);
         }
         else if(OCDist > radius + float.Epsilon) {
             //Outside Sphere
@@ -86,7 +86,7 @@ public class RTSphere : RTHitable {
                     refraction = new RTRay(refractionHitPoint, refractionDir, null);
                 }
 
-                return new RTHitInfo(this, hitPoint, refractionHitPoint, normal, ray, reflection, refraction);
+                return new RTHitInfo(this, Q, normal, ray, reflection, refraction);
             }
         }
         else {

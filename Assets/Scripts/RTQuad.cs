@@ -9,57 +9,6 @@ public class RTQuad : RTHitable {
     public float ABLengthSquared, ACLengthSquared;
     public Vector3 planeNormal;
 
-    private void Awake() {
-        position = transform.position;
-
-        planeNormal = -transform.forward.normalized;
-
-        A.x = -0.5f;
-        A.y = 0.5f;
-        A.z = 0.0f;
-        B.x = 0.5f;
-        B.y = 0.5f;
-        B.z = 0.0f;
-        C.x = -0.5f;
-        C.y = -0.5f;
-        C.z = 0.0f;
-
-        A = transform.localToWorldMatrix * A;
-        B = transform.localToWorldMatrix * B;
-        C = transform.localToWorldMatrix * C;
-        
-        A += position; B += position; C += position;
-
-        AB = B - A;
-        AC = C - A;
-
-        ABLengthSquared = Vector3.Dot(AB, AB);
-        ACLengthSquared = Vector3.Dot(AC, AC);
-    }
-
-    private void Update() {
-
-        //A.x = -0.5f;
-        //A.y = 0.5f;
-        //A.z = 0.0f;
-        //B.x = 0.5f;
-        //B.y = 0.5f;
-        //B.z = 0.0f;
-        //C.x = -0.5f;
-        //C.y = -0.5f;
-        //C.z = 0.0f;
-
-        //A = transform.localToWorldMatrix * A;
-        //B = transform.localToWorldMatrix * B;
-        //C = transform.localToWorldMatrix * C;
-
-        //Debug.DrawLine(A, B, Color.green);
-        //Debug.DrawLine(B, C, Color.green);
-        //Debug.DrawLine(C, A, Color.green);
-        //Debug.DrawRay(position, planeNormal, Color.blue);
-
-    }
-
     public override RTHitInfo CheckCollision(RTRay ray) {
 
         Vector3 N = planeNormal;
@@ -97,5 +46,33 @@ public class RTQuad : RTHitable {
         }
 
         return null;
+    }
+
+    public override void UpdateParameters() {
+        position = transform.position;
+
+        planeNormal = -transform.forward.normalized;
+
+        A.x = -0.5f;
+        A.y = 0.5f;
+        A.z = 0.0f;
+        B.x = 0.5f;
+        B.y = 0.5f;
+        B.z = 0.0f;
+        C.x = -0.5f;
+        C.y = -0.5f;
+        C.z = 0.0f;
+
+        A = transform.localToWorldMatrix * A;
+        B = transform.localToWorldMatrix * B;
+        C = transform.localToWorldMatrix * C;
+
+        A += position; B += position; C += position;
+
+        AB = B - A;
+        AC = C - A;
+
+        ABLengthSquared = Vector3.Dot(AB, AB);
+        ACLengthSquared = Vector3.Dot(AC, AC);
     }
 }

@@ -6,11 +6,6 @@ public class RTSphere : RTHitable {
     
     public float radius;
 
-    private void Awake() {
-        radius = transform.localScale.x / 2.0f;
-        position = transform.position;
-    }
-
     public override RTHitInfo CheckCollision(RTRay ray) {
         Vector3 OC = position - ray.origin;
         float OCDist = OC.magnitude;
@@ -59,4 +54,8 @@ public class RTSphere : RTHitable {
         }
     }
 
+    public override void UpdateParameters() {
+        radius = transform.localScale.x / 2.0f;
+        position = transform.position;
+    }
 }

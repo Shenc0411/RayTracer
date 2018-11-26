@@ -18,6 +18,18 @@ public abstract class RTHitable : MonoBehaviour {
 
     public Vector3 position;
 
+    private void Awake() {
+        UpdateParameters();
+    }
+
+    private void Update() {
+        if (RayTracer.instance.enableRealTimeRendering) {
+            UpdateParameters();
+        }
+    }
+
+    public abstract void UpdateParameters();
+
     public abstract RTHitInfo CheckCollision(RTRay ray);
 
 }

@@ -6,12 +6,10 @@ public class RTDirectionalLight : RTLight {
 
     public Vector3 direction;
 
-    private void Awake() {
-
+    public override void UpdateParameters() {
         intensity = GetComponent<Light>().intensity;
         color = GetComponent<Light>().color;
         direction = transform.forward.normalized;
-
     }
 
 }

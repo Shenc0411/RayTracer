@@ -38,20 +38,30 @@ public class RayTracer : MonoBehaviour {
 
     public static int superSampleKernalIndex = 0;
 
+    public static RayTracer instance;
+
     public float DIRECTIONAL_LIGHT_DISTANCE = 1000f;
     public float HIT_POINT_OFFSET = 0.00001f;
     public float REFRACTION_FACTOR = 0.6f;
     public float SHADOW_FACTOR = 0.1f;
     public float LIGHT_INTENSITY_FACTOR = 0.8f;
     public int MAX_RAY_DEPTH = 1;
+    public int THREAD_NUM = 12;
+
     public bool multiThreadMode = true;
     public bool renderShadows = true;
-    public int CPU_NUM = 12;
     public bool enableSuperSampling = true;
+    public bool enableRealTimeRendering = true;
 
     public static float xScale, yScale;
 
     private void Awake() {
+
+        if(instance != null) {
+            Destroy(this);
+        }
+
+        instance = this;
 
         hitables = new List<RTHitable>();
         directionalLights = new List<RTDirectionalLight>();
@@ -80,6 +90,9 @@ public class RayTracer : MonoBehaviour {
 
         //RenderRays();
         //RenderScreenPlane();
+        if (enableRealTimeRendering) {
+            RayTrace();
+        }
 
     }
 
@@ -170,7 +183,7 @@ public class RayTracer : MonoBehaviour {
 
         List<TraceColorJob> jobs = new List<TraceColorJob>();
 
-        int TCBatchNum = CPU_NUM;
+        int TCBatchNum = THREAD_NUM;
         int TCBatchSize = mCamera.yResolution * mCamera.xResolution * superSampleKernals[superSampleKernalIndex].Length / TCBatchNum;
 
         superSampleKernalIndex = enableSuperSampling ? 1 : 0;
@@ -241,7 +254,7 @@ public class RayTracer : MonoBehaviour {
 
         sw.Stop();
 
-        Debug.Log("Total Ray Spawned: " + RTRay.RAYS_SPAWNDED);
+        //Debug.Log("Total Ray Spawned: " + RTRay.RAYS_SPAWNDED);
         Debug.Log("Ray Tracing Finished: " + sw.Elapsed);
     }
 

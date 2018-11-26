@@ -6,13 +6,11 @@ public class RTPointLight : RTLight {
 
     public Vector3 position;
     public float range;
-    
-    private void Awake() {
 
+    public override void UpdateParameters() {
         intensity = GetComponent<Light>().intensity;
         color = GetComponent<Light>().color;
         position = transform.position;
         range = GetComponent<Light>().range;
     }
-
 }

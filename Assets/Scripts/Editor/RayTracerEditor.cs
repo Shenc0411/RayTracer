@@ -11,7 +11,7 @@ public class RayTracerEditor : Editor {
 
         RayTracer RT = (RayTracer)target;
         if (GUILayout.Button("Render")) {
-            RT.RayTrace();
+            RT.Render();
         }
     }
 

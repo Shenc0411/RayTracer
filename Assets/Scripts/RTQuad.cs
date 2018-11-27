@@ -39,7 +39,7 @@ public class RTQuad : RTHitable {
         if(u >= 0 && u <= ABLengthSquared && v >= 0 && v <= ACLengthSquared) {
             //Collision Detected
 
-            RTHitInfo hitinfo = new RTHitInfo(this, I, N, ray);
+            RTHitInfo hitinfo = new RTHitInfo(this, I, N);
 
             return hitinfo;
 
@@ -75,4 +75,16 @@ public class RTQuad : RTHitable {
         ABLengthSquared = Vector3.Dot(AB, AB);
         ACLengthSquared = Vector3.Dot(AC, AC);
     }
+}
+
+public struct RayQuadPairGPU {
+    public Vector3 rayOrigin;
+    public Vector3 rayDirection;
+    public Vector3 A;
+    public Vector3 B;
+    public Vector3 C;
+    public Vector3 AB;
+    public Vector3 AC;
+    public Vector3 planeNormal;
+    public float ABLengthSquared, ACLengthSquared;
 }

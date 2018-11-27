@@ -5,6 +5,7 @@ using UnityEngine;
 public class RTSphere : RTHitable {
     
     public float radius;
+    public float radiusSqr;
 
     public override RTHitInfo CheckCollision(RTRay ray) {
         Vector3 OC = position - ray.origin;
@@ -14,13 +15,13 @@ public class RTSphere : RTHitable {
             //Inside Sphere
             float OPDist = Vector3.Dot(OC, ray.direction);
             float CPDistSqr = OCDist * OCDist - OPDist * OPDist;
-            float PQDist = Mathf.Sqrt(this.radius * this.radius - CPDistSqr);
+            float QPDist = Mathf.Sqrt(radius * radius - CPDistSqr);
 
-            Vector3 Q = ray.origin + (OPDist + PQDist) * ray.direction; //Actual Hitpoint
+            Vector3 Q = ray.origin + (OPDist + QPDist) * ray.direction; //Actual Hitpoint
 
             Vector3 normal = (position - Q).normalized;
             
-            return new RTHitInfo(this, Q, normal, ray);
+            return new RTHitInfo(this, Q, normal);
         }
         else if(OCDist > radius + float.Epsilon) {
             //Outside Sphere
@@ -29,13 +30,13 @@ public class RTSphere : RTHitable {
                 //No Collision
                 return null;
             }
-            float CPDist = Mathf.Sqrt(OCDist * OCDist - OPDist * OPDist);
-            if(CPDist > radius) {
+            float CPDistSqr = OCDist * OCDist - OPDist * OPDist;
+            if(CPDistSqr > radiusSqr) {
                 //No Collision
                 return null;
             }
             else {
-                float QPDist = Mathf.Sqrt(radius * radius - CPDist * CPDist);
+                float QPDist = Mathf.Sqrt(radius * radius - CPDistSqr);
                 if (OPDist < QPDist) {
                     //No Collision
                     return null;
@@ -45,7 +46,7 @@ public class RTSphere : RTHitable {
 
                 Vector3 normal = (Q - position).normalized;
 
-                return new RTHitInfo(this, Q, normal, ray);
+                return new RTHitInfo(this, Q, normal);
             }
         }
         else {
@@ -56,6 +57,14 @@ public class RTSphere : RTHitable {
 
     public override void UpdateParameters() {
         radius = transform.localScale.x / 2.0f;
+        radiusSqr = radius * radius;
         position = transform.position;
     }
+}
+
+public struct RaySpherePairGPU {
+    public Vector3 rayOrigin;
+    public Vector3 rayDirection;
+    public Vector3 spherePosition;
+    public float sphereRadius;
 }

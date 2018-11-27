@@ -8,6 +8,8 @@ public class RTRay {
 
     public readonly Vector3 origin;
     public readonly Vector3 direction;
+    public RTRay reflection;
+    public RTRay refraction;
 
     public RTRay(Vector3 origin, Vector3 direction) {
         //++RAYS_SPAWNDED;

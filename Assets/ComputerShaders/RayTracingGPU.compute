@@ -1,0 +1,124 @@
+﻿float EPS = 1e-10;
+
+struct RaySpherePair {
+	float3 rayOrigin;
+	float3 rayDirection;
+	float3 spherePosition;
+	float sphereRadius;
+};
+
+struct RayQuadPair {
+	float3 rayOrigin;
+	float3 rayDirection;
+	float3 A;
+	float3 B;
+	float3 C;
+	float3 AB;
+	float3 AC;
+	float3 planeNormal;
+	float ABLengthSquared, ACLengthSquared;
+};
+
+struct HitInfo {
+	float3 hitPoint;
+	float3 hitNormal;
+	float isHit;
+};
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel RaySphereCollision
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+
+StructuredBuffer<RaySpherePair> _RaySpherePairs;
+RWStructuredBuffer<HitInfo> _RSPHitInfos;
+
+[numthreads(32,1,1)]
+void RaySphereCollision(uint3 id : SV_DispatchThreadID)
+{
+	float radiusSqr = _RaySpherePairs[id.x].sphereRadius * _RaySpherePairs[id.x].sphereRadius;
+	float3 OC = _RaySpherePairs[id.x].spherePosition - _RaySpherePairs[id.x].rayOrigin;
+	float OCDist = length(OC);
+	float OPDist = dot(OC, _RaySpherePairs[id.x].rayDirection);
+
+	if (OCDist < _RaySpherePairs[id.x].sphereRadius - EPS)
+	{
+		float CPDistSqr = OCDist * OCDist - OPDist * OPDist;
+		float QPDist = sqrt(radiusSqr - CPDistSqr);
+		_RSPHitInfos[id.x].hitPoint = _RaySpherePairs[id.x].rayOrigin + (OPDist + QPDist) * _RaySpherePairs[id.x].rayDirection;
+		_RSPHitInfos[id.x].hitNormal = normalize(_RaySpherePairs[id.x].spherePosition - _RSPHitInfos[id.x].hitPoint);
+		_RSPHitInfos[id.x].isHit = 1.0;
+	}
+	else if (OCDist > _RaySpherePairs[id.x].sphereRadius + EPS)
+	{
+		float CPDistSqr = OCDist * OCDist - OPDist * OPDist;
+		float QPDist = sqrt(radiusSqr + CPDistSqr);
+		if (OPDist > 0 && CPDistSqr <= radiusSqr)
+		{
+			_RSPHitInfos[id.x].hitPoint = _RaySpherePairs[id.x].rayOrigin + (OPDist - QPDist) * _RaySpherePairs[id.x].rayDirection;
+			_RSPHitInfos[id.x].hitNormal = normalize(_RSPHitInfos[id.x].hitPoint - _RaySpherePairs[id.x].spherePosition);
+			_RSPHitInfos[id.x].isHit = 1.0;
+		}
+		else
+		{
+			_RSPHitInfos[id.x].isHit = 0.0;
+		}
+	}
+	else
+	{
+		_RSPHitInfos[id.x].isHit = 0.0;
+	}
+}
+
+#pragma kernel RayQuadCollision
+
+StructuredBuffer<RayQuadPair> _RayQuadPairs;
+RWStructuredBuffer<HitInfo> _RQHitInfos;
+
+[numthreads(32, 1, 1)]
+void RayQuadCollision(uint3 id : SV_DispatchThreadID)
+{
+	float3 N = _RayQuadPairs[id.x].planeNormal;
+	float3 V = _RayQuadPairs[id.x].rayDirection;
+	float VDotN = dot(V, N);
+	if (VDotN > 0)
+	{
+		N = -N;
+		VDotN = -VDotN;
+	}
+
+	float3 AO = _RayQuadPairs[id.x].rayOrigin - _RayQuadPairs[id.x].A;
+	float AODotN = dot(AO, N);
+	float t = AODotN / -VDotN;
+
+	if (t < EPS)
+	{
+		_RQHitInfos[id.x].isHit = 0;
+	}
+	else
+	{
+		//Vector3 I = ray.origin + V * t; // Actual Hitpoint
+		float3 I = _RayQuadPairs[id.x].rayOrigin + V * t;
+		//Vector3 IA = I - A;
+		float3 IA = I - _RayQuadPairs[id.x].A;
+		
+		float u = dot(IA, _RayQuadPairs[id.x].AB);
+		float v = dot(IA, _RayQuadPairs[id.x].AC);
+
+		if (u >= 0 && u <= _RayQuadPairs[id.x].ABLengthSquared && v >= 0 && v <= _RayQuadPairs[id.x].ACLengthSquared)
+		{
+
+			_RQHitInfos[id.x].hitPoint = I;
+			_RQHitInfos[id.x].hitNormal = N;
+			_RQHitInfos[id.x].isHit = 1.0;
+
+		}
+		else
+		{
+			_RQHitInfos[id.x].isHit = 0;
+		}
+
+	}
+
+}

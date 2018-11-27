@@ -273,14 +273,14 @@ public class RayTracer : MonoBehaviour {
                 for (int j = 0; j < quads.Count; ++j) {
                     int index = mCamera.yResolution * mCamera.xResolution * j + y * mCamera.xResolution + x;
                     if (rayQuadHitInfos[index].isHit > 0) {
-                        renderTexture.SetPixel(x, mCamera.yResolution - y - 1, Color.blue * Vector3.Dot(-rayQuadHitInfos[index].hitNormal, rayQuadPairs[index].rayDirection));
+                        renderTexture.SetPixel(x, mCamera.yResolution - y - 1, new Color(rayQuadHitInfos[index].hitNormal.x, rayQuadHitInfos[index].hitNormal.y, rayQuadHitInfos[index].hitNormal.z));
                     }
                 }
 
                 for (int j = 0; j < spheres.Count; ++j) {
                     int index = mCamera.yResolution * mCamera.xResolution * j + y * mCamera.xResolution + x;
                     if (raySphereHitInfos[index].isHit > 0) {
-                        renderTexture.SetPixel(x, mCamera.yResolution - y - 1, Color.red * Vector3.Dot(-raySphereHitInfos[index].hitNormal, raySpherePairs[index].rayDirection));
+                        renderTexture.SetPixel(x, mCamera.yResolution - y - 1, new Color(raySphereHitInfos[index].hitNormal.x, raySphereHitInfos[index].hitNormal.y, raySphereHitInfos[index].hitNormal.z));
                     }
                 }
             }

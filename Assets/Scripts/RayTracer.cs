@@ -535,22 +535,9 @@ public class RayTracer : MonoBehaviour {
         RTHitInfo hitInfo = null;
         float hitPointDistanceSqr = float.MaxValue;
 
-        foreach (RTQuad quad in quads) {
-            RTHitInfo localHitInfo = quad.CheckCollision(ray);
-            if (localHitInfo != null) {
-                Vector3 hitVec = localHitInfo.hitPoint - ray.origin;
-                if (hitInfo == null) {
-                    hitInfo = localHitInfo;
-                    hitPointDistanceSqr = Vector3.Dot(hitVec, hitVec);
-                }
-                else if (Vector3.Dot(hitVec, hitVec) < hitPointDistanceSqr) {
-                    hitInfo = localHitInfo;
-                }
-            }
-        }
+        foreach (RTHitable hitable in hitables) {
 
-        foreach (RTSphere sphere in spheres) {
-            RTHitInfo localHitInfo = sphere.CheckCollision(ray);
+            RTHitInfo localHitInfo = hitable.CheckCollision(ray);
             if (localHitInfo != null) {
                 Vector3 hitVec = localHitInfo.hitPoint - ray.origin;
                 if (hitInfo == null) {

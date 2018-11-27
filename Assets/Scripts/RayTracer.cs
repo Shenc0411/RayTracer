@@ -68,7 +68,11 @@ public class RayTracer : MonoBehaviour {
     public bool multiThreadMode = true;
     public bool renderShadows = true;
     public bool enableSuperSampling = true;
+    public bool enableReflection = true;
+    public bool enableRefraction = true;
     public bool enableRealTimeRendering = true;
+    
+
 
     public RenderMode renderMode;
 
@@ -410,26 +414,19 @@ public class RayTracer : MonoBehaviour {
 
             result = Mathf.Clamp01(1 - hitInfo.hitable.reflectionRate - hitInfo.hitable.refractionRate) * TraceLightColor(hitInfo);
 
-            if (hitInfo.hitable.reflectionRate > 0 && hitInfo.hitable.refractionRate > 0) {
-
-                Vector3 normalProjVec = hitInfo.hitPointNormal * Vector3.Dot(ray.direction, hitInfo.hitPointNormal);
-
-                result += hitInfo.hitable.reflectionRate * TraceColor(new RTRay(hitInfo.hitPoint + hitInfo.hitPointNormal * HIT_POINT_OFFSET, ray.direction - 2.0f * normalProjVec), depth + 1);
-
-                result += hitInfo.hitable.refractionRate * TraceColor(new RTRay(hitInfo.hitPoint - hitInfo.hitPointNormal * HIT_POINT_OFFSET, normalProjVec + (ray.direction - normalProjVec) * REFRACTION_FACTOR), depth + 1);
-
-            }
-            else if (hitInfo.hitable.reflectionRate > 0) {
+            if (enableReflection && hitInfo.hitable.reflectionRate > 0) {
                 Vector3 normalProjVec = hitInfo.hitPointNormal * Vector3.Dot(ray.direction, hitInfo.hitPointNormal);
 
                 result += hitInfo.hitable.reflectionRate * TraceColor(new RTRay(hitInfo.hitPoint + hitInfo.hitPointNormal * HIT_POINT_OFFSET, ray.direction - 2.0f * normalProjVec), depth + 1);
             }
-            else if (hitInfo.hitable.refractionRate > 0) {
+
+            if (enableRefraction && hitInfo.hitable.refractionRate > 0) {
 
                 Vector3 normalProjVec = hitInfo.hitPointNormal * Vector3.Dot(ray.direction, hitInfo.hitPointNormal);
 
                 result += hitInfo.hitable.refractionRate * TraceColor(new RTRay(hitInfo.hitPoint - hitInfo.hitPointNormal * HIT_POINT_OFFSET, normalProjVec + (ray.direction - normalProjVec) * REFRACTION_FACTOR), depth + 1);
             }
+
         }
 
         return result;

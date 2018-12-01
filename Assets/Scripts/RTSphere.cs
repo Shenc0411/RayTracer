@@ -11,7 +11,7 @@ public class RTSphere : RTHitable {
         Vector3 OC = position - ray.origin;
         float OCDist = OC.magnitude;
 
-        if(OCDist < radius - float.Epsilon) {
+        if(OCDist < radius ) {
             //Inside Sphere
             float OPDist = Vector3.Dot(OC, ray.direction);
             float CPDistSqr = OCDist * OCDist - OPDist * OPDist;
@@ -23,7 +23,7 @@ public class RTSphere : RTHitable {
             
             return new RTHitInfo(this, Q, normal);
         }
-        else if(OCDist > radius + float.Epsilon) {
+        else if(OCDist > radius) {
             //Outside Sphere
             float OPDist = Vector3.Dot(OC, ray.direction);
             if (OPDist < 0) {

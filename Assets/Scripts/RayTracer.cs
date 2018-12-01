@@ -71,18 +71,25 @@ public class RayTracer : MonoBehaviour {
     public bool enableReflection = true;
     public bool enableRefraction = true;
     public bool enableRealTimeRendering = true;
-    
-
+    public bool recordFrames;
+    public string recordPath;
+    public int frameCount;
+    public int frameRate;
+    public int videoSeconds;
+    public int desiredVideoSeconds;
 
     public RenderMode renderMode;
 
     public static float xScale, yScale;
+
 
     private void Awake() {
 
         if(instance != null) {
             Destroy(this);
         }
+
+        frameCount = 0;
 
         instance = this;
 
@@ -111,6 +118,8 @@ public class RayTracer : MonoBehaviour {
             pointLights.Add(PL);
         }
 
+        recordPath = Application.dataPath + "/../" + System.DateTime.Now.ToFileTime();
+        System.IO.Directory.CreateDirectory(recordPath);
     }
 
     private void Start() {
@@ -124,7 +133,15 @@ public class RayTracer : MonoBehaviour {
         if (enableRealTimeRendering) {
             Render();
         }
-
+        if (recordFrames) {
+            byte[] bytes = renderTexture.EncodeToJPG();
+            System.IO.File.WriteAllBytes(recordPath + "/frame" + frameCount + ".jpg", bytes);
+            frameCount++;
+            videoSeconds = frameCount / frameRate;
+            if(videoSeconds >= desiredVideoSeconds) {
+                enableRealTimeRendering = false;
+            }
+        }
     }
 
     private void RenderScreenPlane() {

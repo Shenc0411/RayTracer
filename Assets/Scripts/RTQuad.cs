@@ -24,7 +24,7 @@ public class RTQuad : RTHitable {
         float AODotN = Vector3.Dot(AO, N);
         float t = AODotN / -VDotN;
         
-        if(t < float.Epsilon) {
+        if(t <= 0) {
             //No Coliison - Hitpoint along reverse direction or on plane
             return null;
         }

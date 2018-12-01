@@ -16,14 +16,14 @@ public class RotateAround : MonoBehaviour {
     // Update is called once per frame
     void FixedUpdate () {
         if (RayTracer.instance.enableRealTimeRendering) {
-            angle += Time.fixedDeltaTime;
+            angle += Time.fixedDeltaTime * anglePerSecond;
             if(angle > 360) {
                 angle -= 360;
             }
             if (angle < -360) {
                 angle += 360;
             }
-            transform.position = new Vector3(center.position.x + Mathf.Cos(angle) * radius, transform.position.y, center.position.z + Mathf.Sin(angle) * radius);
+            transform.position = new Vector3(center.position.x + Mathf.Cos(Mathf.Deg2Rad * angle) * radius, transform.position.y, center.position.z + Mathf.Sin(Mathf.Deg2Rad * angle) * radius);
         }
 	}
 }
